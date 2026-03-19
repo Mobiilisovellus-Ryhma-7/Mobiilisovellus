@@ -1,34 +1,23 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { SafeAreaView, StyleSheet } from 'react-native';
 import firebaseApp from './services/firebase';
+import FieldScheduleScreen from './screens/FieldScheduleScreen';
+import { DEFAULT_FIELD_IDS } from './constants/fields';
 
 export default function App() {
-  const projectId = firebaseApp.options.projectId ?? 'unknown';
+  // ensure firebase is initialized (import above)
+  void firebaseApp;
+
+  const initialResourceId = DEFAULT_FIELD_IDS[0];
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Firebase is connected.</Text>
-      <Text style={styles.subtitle}>Project: {projectId}</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaView style={styles.container}>
+      <FieldScheduleScreen initialResourceId={initialResourceId} initialDate={today} />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#374151',
-  },
+  container: { flex: 1 },
 });
