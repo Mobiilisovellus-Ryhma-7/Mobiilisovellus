@@ -1,0 +1,4 @@
+root: c:\Users\valtt\Documents\Github\Mobiilisovellus\backend 
+path: C:\Program Files\nodejs 
+arch: 64 
+proxy: none
