@@ -1,0 +1,6 @@
+specVersion: 1.0.0
+serviceId: hallille-service
+connectorDirs:
+  - connectors/
+cloudSqlInstances:
+  - hallille-instance

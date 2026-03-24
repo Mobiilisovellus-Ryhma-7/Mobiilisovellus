@@ -1,0 +1,36 @@
+# Query Template
+# Copy this and rename to: operationName.gql
+# Update the query name, fields, and auth level as needed
+
+# query YourQueryName @auth(level: PUBLIC) {
+#   # Replace with your table/collection name and fields
+#   resources {
+#     id
+#     name
+#   }
+# }
+
+# ============================================
+
+# Mutation Template with variables
+# mutation YourMutationName($id: UUID!, $name: String!) @auth(level: USER) {
+#   resources_update(data: { name: $name }, where: { id: $id }) {
+#     id
+#     name
+#   }
+# }
+
+# ============================================
+
+# Reference
+
+# Common @auth levels:
+# - PUBLIC: No authentication required
+# - USER: User must be authenticated  
+# - ADMIN: User must have admin role
+#
+# Common operations:
+# - table_insert(data: { ... }) - Insert new row
+# - table_update(data: { ... }, where: { ... }) - Update rows
+# - table_delete(where: { ... }) - Delete rows
+# - table(where: { ... }, orderBy: [...], limit: N) - Query rows
