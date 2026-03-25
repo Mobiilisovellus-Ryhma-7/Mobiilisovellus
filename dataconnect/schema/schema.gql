@@ -1,0 +1,30 @@
+type User @table(name: "User") {
+  id: UUID!
+  email: String
+  firstName: String
+  lastName: String
+}
+
+type FacilityType @table(name: "FacilityType") {
+  id: UUID!
+  name: String!
+}
+
+type Facility @table(name: "Facility") {
+  id: UUID!
+  name: String!
+  address: String
+  type: FacilityType
+  description: String
+  openingHours: String
+  contactNumber: String
+  imageUrl: String
+}
+
+type Booking @table(name: "Booking") {
+  id: UUID!
+  user: User
+  facility: Facility
+  bookingTime: Date!
+  status: String
+}

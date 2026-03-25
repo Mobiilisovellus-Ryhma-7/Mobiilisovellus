@@ -1,0 +1,15 @@
+query ListAllFacilities @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  facilities {
+    id
+    name
+    address
+    type {
+      name
+    }
+    description
+    openingHours
+    contactNumber
+    imageUrl
+  }
+}
+
