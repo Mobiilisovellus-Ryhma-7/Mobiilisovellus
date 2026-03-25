@@ -7,69 +7,62 @@ import {
   mutationRef,
   queryRef,
 } from 'firebase/data-connect';
-import { getStorage } from 'firebase/storage';
 
-const envVars = {
-  EXPO_PUBLIC_FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:
-    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+// Generic env var collector
+const getEnvVars = (keys: string[]) =>
+  Object.fromEntries(keys.map(key => [key, process.env[`EXPO_PUBLIC_${key}`]]));
+
+const firebaseVars = getEnvVars([
+  'FIREBASE_API_KEY',
+  'FIREBASE_AUTH_DOMAIN',
+  'FIREBASE_PROJECT_ID',
+  'FIREBASE_MESSAGING_SENDER_ID',
+  'FIREBASE_APP_ID',
+]);
+
+const validateVars = (vars: Record<string, any>) => {
+  const missing = Object.entries(vars)
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  return missing.length > 0 ? missing : null;
 };
 
-const missingEnvVars = Object.entries(envVars)
-  .filter(([, value]) => !value)
-  .map(([key]) => key);
-
-export const firebaseInitError =
-  missingEnvVars.length > 0
-    ? `Missing Firebase env vars: ${missingEnvVars.join(', ')}. Check your .env file and restart Expo.`
-    : null;
+export const firebaseInitError = validateVars(firebaseVars)
+  ? `Missing Firebase env vars. Check your .env file and restart Expo.`
+  : null;
 
 const firebaseConfig: FirebaseOptions = {
-  apiKey: envVars.EXPO_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: envVars.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: envVars.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: envVars.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: envVars.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: envVars.EXPO_PUBLIC_FIREBASE_APP_ID!,
+  apiKey: firebaseVars.FIREBASE_API_KEY,
+  authDomain: firebaseVars.FIREBASE_AUTH_DOMAIN,
+  projectId: firebaseVars.FIREBASE_PROJECT_ID,
+  messagingSenderId: firebaseVars.FIREBASE_MESSAGING_SENDER_ID,
+  appId: firebaseVars.FIREBASE_APP_ID,
 };
 
-const app: FirebaseApp | null =
-  firebaseInitError === null
-    ? getApps().length > 0
-      ? getApp()
-      : initializeApp(firebaseConfig)
-    : null;
+const app: FirebaseApp | null = !firebaseInitError && getApps().length === 0
+  ? initializeApp(firebaseConfig)
+  : getApp() ?? null;
 
 export const auth = app ? getAuth(app) : null;
-export const storage = app ? getStorage(app) : null;
 
-const dataConnectEnv = {
-  EXPO_PUBLIC_FIREBASE_DATA_CONNECT_LOCATION:
-    process.env.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_LOCATION,
-  EXPO_PUBLIC_FIREBASE_DATA_CONNECT_SERVICE:
-    process.env.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_SERVICE,
-  EXPO_PUBLIC_FIREBASE_DATA_CONNECT_CONNECTOR:
-    process.env.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_CONNECTOR,
-  EXPO_PUBLIC_FIREBASE_DATA_CONNECT_HEALTH_QUERY:
-    process.env.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_HEALTH_QUERY,
-  EXPO_PUBLIC_FIREBASE_DATA_CONNECT_HEALTH_MUTATION:
-    process.env.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_HEALTH_MUTATION,
-};
+const dataConnectVars = getEnvVars([
+  'FIREBASE_DATA_CONNECT_LOCATION',
+  'FIREBASE_DATA_CONNECT_SERVICE',
+  'FIREBASE_DATA_CONNECT_CONNECTOR',
+  'FIREBASE_DATA_CONNECT_HEALTH_QUERY',
+  'FIREBASE_DATA_CONNECT_HEALTH_MUTATION',
+]);
 
 const DEFAULT_CONNECTION_QUERY = 'ListAllFacilities';
 
 function getRequiredDataConnectConfig() {
   const requiredKeys = [
-    'EXPO_PUBLIC_FIREBASE_DATA_CONNECT_LOCATION',
-    'EXPO_PUBLIC_FIREBASE_DATA_CONNECT_SERVICE',
-    'EXPO_PUBLIC_FIREBASE_DATA_CONNECT_CONNECTOR',
+    'FIREBASE_DATA_CONNECT_LOCATION',
+    'FIREBASE_DATA_CONNECT_SERVICE',
+    'FIREBASE_DATA_CONNECT_CONNECTOR',
   ] as const;
 
-  const missingKeys = requiredKeys.filter((key) => !dataConnectEnv[key]);
+  const missingKeys = requiredKeys.filter((key) => !dataConnectVars[key]);
 
   if (missingKeys.length > 0) {
     throw new Error(
@@ -78,13 +71,11 @@ function getRequiredDataConnectConfig() {
   }
 
   return {
-    location: dataConnectEnv.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_LOCATION!,
-    service: dataConnectEnv.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_SERVICE!,
-    connector: dataConnectEnv.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_CONNECTOR!,
-    healthQuery:
-      dataConnectEnv.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_HEALTH_QUERY ??
-      DEFAULT_CONNECTION_QUERY,
-    healthMutation: dataConnectEnv.EXPO_PUBLIC_FIREBASE_DATA_CONNECT_HEALTH_MUTATION,
+    location: dataConnectVars.FIREBASE_DATA_CONNECT_LOCATION!,
+    service: dataConnectVars.FIREBASE_DATA_CONNECT_SERVICE!,
+    connector: dataConnectVars.FIREBASE_DATA_CONNECT_CONNECTOR!,
+    healthQuery: dataConnectVars.FIREBASE_DATA_CONNECT_HEALTH_QUERY ?? DEFAULT_CONNECTION_QUERY,
+    healthMutation: dataConnectVars.FIREBASE_DATA_CONNECT_HEALTH_MUTATION,
   };
 }
 
@@ -130,7 +121,7 @@ export async function runDataConnectHealthCheck(): Promise<DataConnectHealthChec
 
   return {
     ok: true,
-    projectId: envVars.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
+    projectId: firebaseVars.FIREBASE_PROJECT_ID!,
     connector: config.connector,
     location: config.location,
     service: config.service,
