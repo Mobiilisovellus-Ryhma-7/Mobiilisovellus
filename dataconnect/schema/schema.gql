@@ -1,30 +1,35 @@
-type User @table(name: "User") {
+type User @table(name: "users") {
   id: UUID!
   email: String
-  firstName: String
-  lastName: String
+  name: String
+  createdAt: Timestamp
 }
 
-type FacilityType @table(name: "FacilityType") {
+type Facility @table(name: "facilities") {
   id: UUID!
-  name: String!
-}
-
-type Facility @table(name: "Facility") {
-  id: UUID!
-  name: String!
+  name: String
   address: String
-  type: FacilityType
   description: String
   openingHours: String
   contactNumber: String
   imageUrl: String
+  createdAt: Timestamp
 }
 
-type Booking @table(name: "Booking") {
+type FacilitySection @table(name: "facility_sections") {
   id: UUID!
-  user: User
-  facility: Facility
-  bookingTime: Date!
+  facilityId: UUID
+  name: String
+  sport: String
+  description: String
+  createdAt: Timestamp
+}
+
+type Booking @table(name: "bookings") {
+  id: UUID!
   status: String
+  bookingTime: Timestamp
+  userId: UUID
+  sectionId: UUID
+  createdAt: Timestamp
 }

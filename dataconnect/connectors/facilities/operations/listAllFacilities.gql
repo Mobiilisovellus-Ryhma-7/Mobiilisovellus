@@ -3,9 +3,6 @@ query ListAllFacilities @auth(level: PUBLIC, insecureReason: "This operation is 
     id
     name
     address
-    type {
-      name
-    }
     description
     openingHours
     contactNumber
