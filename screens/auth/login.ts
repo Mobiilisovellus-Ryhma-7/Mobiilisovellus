@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
-import { Image, Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
+import {
+	Image,
+	KeyboardAvoidingView,
+	Platform,
+	Pressable,
+	SafeAreaView,
+	ScrollView,
+	StyleSheet,
+	View,
+	useWindowDimensions,
+} from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
+import { getResponsiveMetrics } from '../shared/responsive';
 
 type LoginProps = {
 	onBack?: () => void;
@@ -16,16 +27,34 @@ export default function Login({
 	onLogin,
 }: LoginProps) {
 	const { colors } = useTheme();
-	const [email, setEmail] = useState('esimerkki@sposti.com');
-	const [password, setPassword] = useState('...........');
+	const { width } = useWindowDimensions();
+	const metrics = getResponsiveMetrics(width);
+	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+	const [email, setEmail] = useState('');
+	const [password, setPassword] = useState('');
 	const [secureEntry, setSecureEntry] = useState(true);
 
 	return React.createElement(
 		SafeAreaView,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
-			View,
-			{ style: [styles.screen, { backgroundColor: colors.background }] },
+			KeyboardAvoidingView,
+			{
+				style: [styles.screen, { backgroundColor: colors.background }],
+				behavior: Platform.OS === 'ios' ? 'padding' : undefined,
+				keyboardVerticalOffset: Platform.OS === 'ios' ? 12 : 0,
+			},
+			React.createElement(
+				ScrollView,
+				{
+					contentContainerStyle: styles.scrollContent,
+					showsVerticalScrollIndicator: false,
+					keyboardShouldPersistTaps: 'handled',
+					keyboardDismissMode: 'on-drag',
+				},
+				React.createElement(
+					View,
+					{ style: styles.contentWrap },
 			React.createElement(
 				View,
 				{ style: styles.headerRow },
@@ -48,11 +77,11 @@ export default function Login({
 
 			React.createElement(Text, {
 				style: [styles.title, { color: colors.onSurface }],
-				children: 'Kirjaudu sisaan',
+				children: 'Kirjaudu sisään',
 			}),
 			React.createElement(Text, {
 				style: styles.subtitle,
-				children: 'Hei, mukava nahda sinua taas!',
+				children: 'Hei, mukava nähdä sinua taas!',
 			}),
 
 			React.createElement(Text, {
@@ -63,6 +92,7 @@ export default function Login({
 				mode: 'flat',
 				value: email,
 				onChangeText: setEmail,
+				placeholder: 'esimerkki@sposti.com',
 				style: styles.input,
 				underlineColor: '#d3d7dc',
 				activeUnderlineColor: colors.primary,
@@ -77,6 +107,7 @@ export default function Login({
 				mode: 'flat',
 				value: password,
 				onChangeText: setPassword,
+				placeholder: 'Salasana',
 				secureTextEntry: secureEntry,
 				style: styles.input,
 				underlineColor: '#d3d7dc',
@@ -95,7 +126,7 @@ export default function Login({
 				style: styles.loginButton,
 				contentStyle: styles.loginButtonContent,
 				labelStyle: styles.loginButtonLabel,
-				children: 'Kirjaudu sisaan',
+				children: 'Kirjaudu sisään',
 			}),
 
 			React.createElement(
@@ -114,116 +145,134 @@ export default function Login({
 					{ onPress: onRegister },
 					React.createElement(Text, {
 						style: styles.registerText,
-						children: 'Rekisteroidy',
+						children: 'Rekisteröidy',
 					})
 				)
+			)
+			)
 			)
 		)
 	);
 }
 
-const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#ececec',
-	},
-	screen: {
-		flex: 1,
-		backgroundColor: '#ececec',
-		paddingHorizontal: 30,
-		paddingTop: 20,
-		paddingBottom: 34,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: 8,
-	},
-	backButton: {
-		width: 34,
-		height: 34,
-		borderRadius: 17,
-		backgroundColor: '#e8e8e8',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	backIcon: {
-		fontSize: 26,
-		lineHeight: 26,
-		color: '#616161',
-		marginTop: -2,
-	},
-	headerSpacer: {
-		width: 34,
-		height: 34,
-	},
-	logo: {
-		width: 108,
-		height: 96,
-		alignSelf: 'center',
-	},
-	brand: {
-		alignSelf: 'center',
-		marginTop: 4,
-		fontSize: 14,
-		color: '#9aa6b3',
-		fontWeight: '700',
-	},
-	title: {
-		marginTop: 44,
-		fontSize: 42,
-		fontWeight: '700',
-	},
-	subtitle: {
-		marginTop: 10,
-		marginBottom: 24,
-		fontSize: 27,
-		color: '#9aa6b3',
-	},
-	label: {
-		fontSize: 20,
-		color: '#0d8bf2',
-		fontWeight: '700',
-		marginBottom: 4,
-	},
-	passwordLabel: {
-		marginTop: 18,
-	},
-	input: {
-		backgroundColor: 'transparent',
-		fontSize: 29,
-		paddingHorizontal: 0,
-	},
-	inputContent: {
-		fontSize: 29,
-		paddingLeft: 0,
-	},
-	loginButton: {
-		marginTop: 34,
-		borderRadius: 10,
-	},
-	loginButtonContent: {
-		height: 62,
-	},
-	loginButtonLabel: {
-		fontSize: 31,
-		fontWeight: '700',
-	},
-	bottomLinks: {
-		marginTop: 'auto',
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	forgotText: {
-		color: '#9aa6b3',
-		fontSize: 26,
-		fontWeight: '500',
-	},
-	registerText: {
-		color: '#0d8bf2',
-		fontSize: 26,
-		fontWeight: '700',
-	},
-});
+const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+	StyleSheet.create({
+		safeArea: {
+			flex: 1,
+			backgroundColor: '#ececec',
+		},
+		screen: {
+			flex: 1,
+			backgroundColor: '#ececec',
+		},
+		scrollContent: {
+			paddingHorizontal: metrics.horizontalPadding,
+			paddingTop: metrics.scale(20, 16, 34),
+			paddingBottom: metrics.scale(48, 32, 64),
+			alignItems: 'center',
+			minHeight: '100%',
+		},
+		contentWrap: {
+			width: '100%',
+			maxWidth: metrics.contentMaxWidth,
+			backgroundColor: '#f7f9fc',
+			borderRadius: metrics.scale(22, 18, 28),
+			paddingHorizontal: metrics.scale(18, 14, 26),
+			paddingVertical: metrics.scale(16, 12, 22),
+		},
+		headerRow: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			justifyContent: 'space-between',
+			marginBottom: metrics.scale(8, 6, 14),
+		},
+		backButton: {
+			width: metrics.scale(34, 32, 42),
+			height: metrics.scale(34, 32, 42),
+			borderRadius: metrics.scale(17, 16, 21),
+			backgroundColor: '#e8e8e8',
+			alignItems: 'center',
+			justifyContent: 'center',
+		},
+		backIcon: {
+			fontSize: metrics.scale(26, 20, 28),
+			lineHeight: metrics.scale(26, 20, 28),
+			color: '#616161',
+			marginTop: -2,
+		},
+		headerSpacer: {
+			width: metrics.scale(34, 32, 42),
+			height: metrics.scale(34, 32, 42),
+		},
+		logo: {
+			width: metrics.scale(108, 88, 130),
+			height: metrics.scale(96, 76, 116),
+			alignSelf: 'center',
+		},
+		brand: {
+			alignSelf: 'center',
+			marginTop: metrics.scale(4, 2, 8),
+			fontSize: metrics.scale(13, 11, 16),
+			color: '#9aa6b3',
+			fontWeight: '700',
+			letterSpacing: 0.4,
+		},
+		title: {
+			marginTop: metrics.scale(28, 18, 36),
+			fontSize: metrics.scale(31, 24, 38),
+			fontWeight: '700',
+		},
+		subtitle: {
+			marginTop: metrics.scale(10, 8, 16),
+			marginBottom: metrics.scale(20, 14, 28),
+			fontSize: metrics.scale(18, 14, 22),
+			color: '#9aa6b3',
+		},
+		label: {
+			fontSize: metrics.scale(16, 14, 20),
+			color: '#0d8bf2',
+			fontWeight: '700',
+			marginBottom: 4,
+		},
+		passwordLabel: {
+			marginTop: metrics.scale(18, 14, 24),
+		},
+		input: {
+			backgroundColor: 'transparent',
+			fontSize: metrics.scale(20, 16, 24),
+			paddingHorizontal: 0,
+		},
+		inputContent: {
+			fontSize: metrics.scale(20, 16, 24),
+			paddingLeft: 0,
+		},
+		loginButton: {
+			marginTop: metrics.scale(34, 22, 40),
+			borderRadius: metrics.scale(10, 10, 14),
+		},
+		loginButtonContent: {
+			height: metrics.scale(62, 50, 70),
+		},
+		loginButtonLabel: {
+			fontSize: metrics.scale(21, 17, 25),
+			fontWeight: '700',
+		},
+		bottomLinks: {
+			marginTop: metrics.scale(30, 20, 40),
+			flexDirection: 'row',
+			justifyContent: 'space-between',
+			alignItems: 'center',
+			gap: metrics.scale(12, 8, 20),
+			flexWrap: 'wrap',
+		},
+		forgotText: {
+			color: '#9aa6b3',
+			fontSize: metrics.scale(16, 13, 20),
+			fontWeight: '500',
+		},
+		registerText: {
+			color: '#0d8bf2',
+			fontSize: metrics.scale(16, 13, 20),
+			fontWeight: '700',
+		},
+	});

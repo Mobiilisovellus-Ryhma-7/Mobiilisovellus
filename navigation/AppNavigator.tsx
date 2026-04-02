@@ -61,7 +61,12 @@ export default function AppNavigator() {
       </Stack.Screen>
 
       <Stack.Screen name="register">
-        {({ navigation }) => <Register onGoLogin={() => navigation.navigate('login')} />}
+        {({ navigation }) => (
+          <Register
+            onBack={() => navigation.goBack()}
+            onGoLogin={() => navigation.navigate('login')}
+          />
+        )}
       </Stack.Screen>
 
       <Stack.Screen name="profile">
