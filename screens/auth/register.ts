@@ -1,42 +1,87 @@
 import React, { useState } from 'react';
-import { Pressable, SafeAreaView, StyleSheet, View, Image } from 'react-native';
+import {
+	KeyboardAvoidingView,
+	Platform,
+	Pressable,
+	SafeAreaView,
+	ScrollView,
+	StyleSheet,
+	View,
+	Image,
+	useWindowDimensions,
+} from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
+import { getResponsiveMetrics } from '../shared/responsive';
 
 type RegisterProps = {
+	onBack?: () => void;
 	onRegister?: () => void;
 	onGoLogin?: () => void;
 };
 
-export default function Register({ onRegister, onGoLogin }: RegisterProps) {
+export default function Register({ onBack, onRegister, onGoLogin }: RegisterProps) {
 	const { colors } = useTheme();
-	const [email, setEmail] = useState('esimerkki@sposti.com');
-	const [password, setPassword] = useState('....................');
+	const { width } = useWindowDimensions();
+	const metrics = getResponsiveMetrics(width);
+	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+	const [email, setEmail] = useState('');
+	const [password, setPassword] = useState('');
 
 	return React.createElement(
 		SafeAreaView,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
-			View,
-			{ style: [styles.screen, { backgroundColor: colors.background }] },
+			KeyboardAvoidingView,
+			{
+				style: [styles.screen, { backgroundColor: colors.background }],
+				behavior: Platform.OS === 'ios' ? 'padding' : undefined,
+				keyboardVerticalOffset: Platform.OS === 'ios' ? 12 : 0,
+			},
+			React.createElement(
+				ScrollView,
+				{
+					contentContainerStyle: styles.scrollContent,
+					showsVerticalScrollIndicator: false,
+					keyboardShouldPersistTaps: 'handled',
+					keyboardDismissMode: 'on-drag',
+				},
+				React.createElement(
+					View,
+					{ style: styles.contentWrap },
+			React.createElement(
+				View,
+				{ style: styles.headerRow },
+				React.createElement(
+					Pressable,
+					{ style: styles.backButton, onPress: onBack },
+					React.createElement(Text, { style: styles.backIcon, children: '‹' })
+				),
+				React.createElement(View, { style: styles.headerSpacer })
+			),
 			React.createElement(Image, {
 				source: require('../../assets/dynamic-sport-hall-logo.png'),
 				style: styles.logo,
 				resizeMode: 'contain',
 			}),
+			React.createElement(Text, {
+				style: styles.brand,
+				children: 'Hallille',
+			}),
 
 			React.createElement(Text, {
 				style: [styles.title, { color: colors.onSurface }],
-				children: 'Rekisteroityminen',
+				children: 'Rekisteröityminen',
 			}),
 
 			React.createElement(Text, {
 				style: styles.label,
-				children: 'Sahkoposti',
+				children: 'Sähköposti',
 			}),
 			React.createElement(TextInput, {
 				mode: 'flat',
 				value: email,
 				onChangeText: setEmail,
+				placeholder: 'esimerkki@sposti.com',
 				style: styles.input,
 				underlineColor: '#d3d7dc',
 				activeUnderlineColor: colors.primary,
@@ -51,6 +96,7 @@ export default function Register({ onRegister, onGoLogin }: RegisterProps) {
 				mode: 'flat',
 				value: password,
 				onChangeText: setPassword,
+				placeholder: 'Salasana',
 				secureTextEntry: true,
 				style: styles.input,
 				underlineColor: '#d3d7dc',
@@ -64,7 +110,7 @@ export default function Register({ onRegister, onGoLogin }: RegisterProps) {
 				style: styles.registerButton,
 				contentStyle: styles.registerButtonContent,
 				labelStyle: styles.registerButtonLabel,
-				children: 'Rekisteroidy',
+				children: 'Rekisteröidy',
 			}),
 
 			React.createElement(
@@ -72,88 +118,136 @@ export default function Register({ onRegister, onGoLogin }: RegisterProps) {
 				{ style: styles.loginLinkWrap },
 				React.createElement(Text, {
 					style: styles.loginPrefix,
-					children: 'Loytyyko jo kayttaja?',
+					children: 'Löytyykö jo käyttäjä?',
 				}),
 				React.createElement(
 					Pressable,
 					{ onPress: onGoLogin },
 					React.createElement(Text, {
 						style: styles.loginLink,
-						children: 'Kirjaudu sisaan',
+						children: 'Kirjaudu sisään',
 					})
 				)
+			)
+			)
 			)
 		)
 	);
 }
 
-const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#ececec',
-	},
-	screen: {
-		flex: 1,
-		backgroundColor: '#ececec',
-		paddingHorizontal: 30,
-		paddingTop: 56,
-		paddingBottom: 34,
-	},
-	logo: {
-		width: 120,
-		height: 112,
-		alignSelf: 'center',
-		marginBottom: 24,
-	},
-	title: {
-		fontSize: 42,
-		fontWeight: '700',
-		marginBottom: 30,
-	},
-	label: {
-		fontSize: 20,
-		color: '#0d8bf2',
-		fontWeight: '700',
-		marginBottom: 4,
-	},
-	passwordLabel: {
-		marginTop: 18,
-	},
-	input: {
-		backgroundColor: 'transparent',
-		fontSize: 29,
-		paddingHorizontal: 0,
-	},
-	inputContent: {
-		fontSize: 29,
-		paddingLeft: 0,
-	},
-	registerButton: {
-		marginTop: 36,
-		borderRadius: 10,
-	},
-	registerButtonContent: {
-		height: 62,
-	},
-	registerButtonLabel: {
-		fontSize: 31,
-		fontWeight: '700',
-	},
-	loginLinkWrap: {
-		marginTop: 14,
-		flexDirection: 'row',
-		justifyContent: 'center',
-		alignItems: 'center',
-		gap: 6,
-	},
-	loginPrefix: {
-		color: '#9aa6b3',
-		fontSize: 26,
-		fontWeight: '500',
-	},
-	loginLink: {
-		color: '#0d8bf2',
-		fontSize: 26,
-		fontWeight: '700',
-	},
-});
+const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+	StyleSheet.create({
+		safeArea: {
+			flex: 1,
+			backgroundColor: '#ececec',
+		},
+		screen: {
+			flex: 1,
+			backgroundColor: '#ececec',
+		},
+		scrollContent: {
+			paddingHorizontal: metrics.horizontalPadding,
+			paddingTop: metrics.scale(56, 26, 72),
+			paddingBottom: metrics.scale(48, 32, 64),
+			alignItems: 'center',
+			minHeight: '100%',
+		},
+		contentWrap: {
+			width: '100%',
+			maxWidth: metrics.contentMaxWidth,
+			backgroundColor: '#f7f9fc',
+			borderRadius: metrics.scale(22, 18, 28),
+			paddingHorizontal: metrics.scale(18, 14, 26),
+			paddingVertical: metrics.scale(16, 12, 22),
+		},
+		headerRow: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			justifyContent: 'space-between',
+			marginBottom: metrics.scale(8, 6, 14),
+		},
+		backButton: {
+			width: metrics.scale(34, 32, 42),
+			height: metrics.scale(34, 32, 42),
+			borderRadius: metrics.scale(17, 16, 21),
+			backgroundColor: '#e8e8e8',
+			alignItems: 'center',
+			justifyContent: 'center',
+		},
+		backIcon: {
+			fontSize: metrics.scale(26, 20, 28),
+			lineHeight: metrics.scale(26, 20, 28),
+			color: '#616161',
+			marginTop: -2,
+		},
+		headerSpacer: {
+			width: metrics.scale(34, 32, 42),
+			height: metrics.scale(34, 32, 42),
+		},
+		logo: {
+			width: metrics.scale(120, 92, 140),
+			height: metrics.scale(112, 86, 132),
+			alignSelf: 'center',
+			marginBottom: metrics.scale(6, 4, 10),
+		},
+		brand: {
+			alignSelf: 'center',
+			fontSize: metrics.scale(13, 11, 16),
+			color: '#9aa6b3',
+			fontWeight: '700',
+			letterSpacing: 0.4,
+			marginBottom: metrics.scale(20, 14, 28),
+		},
+		title: {
+			fontSize: metrics.scale(31, 24, 38),
+			fontWeight: '700',
+			marginBottom: metrics.scale(20, 12, 28),
+		},
+		label: {
+			fontSize: metrics.scale(16, 14, 20),
+			color: '#0d8bf2',
+			fontWeight: '700',
+			marginBottom: 4,
+		},
+		passwordLabel: {
+			marginTop: metrics.scale(18, 14, 24),
+		},
+		input: {
+			backgroundColor: 'transparent',
+			fontSize: metrics.scale(20, 16, 24),
+			paddingHorizontal: 0,
+		},
+		inputContent: {
+			fontSize: metrics.scale(20, 16, 24),
+			paddingLeft: 0,
+		},
+		registerButton: {
+			marginTop: metrics.scale(36, 24, 44),
+			borderRadius: metrics.scale(10, 10, 14),
+		},
+		registerButtonContent: {
+			height: metrics.scale(62, 50, 70),
+		},
+		registerButtonLabel: {
+			fontSize: metrics.scale(21, 17, 25),
+			fontWeight: '700',
+		},
+		loginLinkWrap: {
+			marginTop: metrics.scale(14, 10, 22),
+			flexDirection: 'row',
+			justifyContent: 'center',
+			alignItems: 'center',
+			gap: 6,
+			flexWrap: 'wrap',
+		},
+		loginPrefix: {
+			color: '#9aa6b3',
+			fontSize: metrics.scale(16, 13, 20),
+			fontWeight: '500',
+		},
+		loginLink: {
+			color: '#0d8bf2',
+			fontSize: metrics.scale(16, 13, 20),
+			fontWeight: '700',
+		},
+	});

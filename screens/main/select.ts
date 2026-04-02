@@ -1,6 +1,13 @@
 import React from 'react';
-import { Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
+import { getResponsiveMetrics } from '../shared/responsive';
 
 type SelectProps = {
   onBack?: () => void;
@@ -9,6 +16,9 @@ type SelectProps = {
 
 export default function Select({ onBack, onSearch }: SelectProps) {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const metrics = getResponsiveMetrics(width);
+  const styles = React.useMemo(() => createStyles(metrics), [metrics]);
 
   return React.createElement(
     SafeAreaView,
@@ -47,7 +57,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
           { style: styles.inputLine },
           React.createElement(Text, {
             style: styles.inputPlaceholder,
-            children: 'Valitse paivamaara',
+            children: 'Valitse päivämäärä',
           })
         )
       ),
@@ -67,76 +77,91 @@ export default function Select({ onBack, onSearch }: SelectProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#ececec',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#ececec',
-    paddingHorizontal: 26,
-    paddingTop: 20,
-    paddingBottom: 28,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#e8e8e8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 26,
-    lineHeight: 26,
-    color: '#616161',
-    marginTop: -2,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0f172a',
-    letterSpacing: 0.4,
-  },
-  headerSpacer: {
-    width: 34,
-    height: 34,
-  },
-  formArea: {
-    marginTop: 82,
-    gap: 28,
-    paddingHorizontal: 16,
-  },
-  inputLine: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#d9d9d9',
-    paddingBottom: 10,
-  },
-  inputPlaceholder: {
-    color: '#b7b7b7',
-    fontSize: 27,
-    fontWeight: '400',
-  },
-  bottomArea: {
-    marginTop: 'auto',
-    alignItems: 'center',
-  },
-  searchButton: {
-    width: '90%',
-    borderRadius: 28,
-  },
-  searchButtonContent: {
-    height: 56,
-  },
-  searchButtonText: {
-    fontSize: 27,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-});
+const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: '#ececec',
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: '#ececec',
+      paddingHorizontal: metrics.horizontalPadding,
+      paddingTop: metrics.scale(20, 14, 28),
+      paddingBottom: metrics.scale(28, 20, 34),
+      alignItems: 'center',
+    },
+    headerRow: {
+      width: '100%',
+      maxWidth: metrics.contentMaxWidth,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#f7f9fc',
+      borderRadius: metrics.scale(18, 14, 24),
+      paddingHorizontal: metrics.scale(14, 10, 18),
+      paddingVertical: metrics.scale(10, 8, 14),
+    },
+    backButton: {
+      width: metrics.scale(34, 32, 42),
+      height: metrics.scale(34, 32, 42),
+      borderRadius: metrics.scale(17, 16, 21),
+      backgroundColor: '#e8e8e8',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backIcon: {
+      fontSize: metrics.scale(26, 20, 28),
+      lineHeight: metrics.scale(26, 20, 28),
+      color: '#616161',
+      marginTop: -2,
+    },
+    title: {
+      fontSize: metrics.scale(20, 17, 24),
+      fontWeight: '700',
+      color: '#0f172a',
+      letterSpacing: 0.4,
+    },
+    headerSpacer: {
+      width: metrics.scale(34, 32, 42),
+      height: metrics.scale(34, 32, 42),
+    },
+    formArea: {
+      width: '100%',
+      maxWidth: metrics.contentMaxWidth,
+      marginTop: metrics.scale(26, 18, 36),
+      gap: metrics.scale(20, 14, 28),
+      paddingHorizontal: metrics.scale(16, 10, 24),
+      paddingVertical: metrics.scale(20, 14, 28),
+      backgroundColor: '#f7f9fc',
+      borderRadius: metrics.scale(24, 18, 30),
+    },
+    inputLine: {
+      borderBottomWidth: 1,
+      borderBottomColor: '#d9d9d9',
+      paddingBottom: metrics.scale(10, 8, 14),
+    },
+    inputPlaceholder: {
+      color: '#b7b7b7',
+      fontSize: metrics.scale(19, 15, 24),
+      fontWeight: '400',
+    },
+    bottomArea: {
+      marginTop: 'auto',
+      alignItems: 'center',
+      width: '100%',
+      maxWidth: metrics.contentMaxWidth,
+    },
+    searchButton: {
+      width: '100%',
+      borderRadius: metrics.scale(16, 12, 22),
+    },
+    searchButtonContent: {
+      height: metrics.scale(56, 48, 64),
+    },
+    searchButtonText: {
+      fontSize: metrics.scale(20, 16, 24),
+      fontWeight: '500',
+      color: '#ffffff',
+    },
+  });

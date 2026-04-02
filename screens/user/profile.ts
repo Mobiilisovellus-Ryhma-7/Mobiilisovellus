@@ -1,6 +1,13 @@
 import React from 'react';
-import { Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
+import {
+	Pressable,
+	SafeAreaView,
+	StyleSheet,
+	View,
+	useWindowDimensions,
+} from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
+import { getResponsiveMetrics } from '../shared/responsive';
 
 type ProfileProps = {
 	onBack?: () => void;
@@ -8,6 +15,9 @@ type ProfileProps = {
 
 export default function Profile({ onBack }: ProfileProps) {
 	const { colors } = useTheme();
+	const { width } = useWindowDimensions();
+	const metrics = getResponsiveMetrics(width);
+	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
 
 	return React.createElement(
 		SafeAreaView,
@@ -54,53 +64,59 @@ export default function Profile({ onBack }: ProfileProps) {
 	);
 }
 
-const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: '#ececec',
-	},
-	screen: {
-		flex: 1,
-		backgroundColor: '#ececec',
-		paddingHorizontal: 22,
-		paddingTop: 20,
-		paddingBottom: 20,
-	},
-	headerRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	},
-	backButton: {
-		width: 34,
-		height: 34,
-		borderRadius: 17,
-		backgroundColor: '#e8e8e8',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	backIcon: {
-		fontSize: 26,
-		lineHeight: 26,
-		color: '#616161',
-		marginTop: -2,
-	},
-	headerTitle: {
-		fontSize: 30,
-		fontWeight: '700',
-		letterSpacing: 0.6,
-	},
-	headerSpacer: {
-		width: 34,
-		height: 34,
-	},
-	menuWrap: {
-		marginTop: 72,
-		gap: 32,
-		paddingLeft: 10,
-	},
-	menuItem: {
-		fontSize: 31,
-		fontWeight: '600',
-	},
-});
+const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+	StyleSheet.create({
+		safeArea: {
+			flex: 1,
+			backgroundColor: '#ececec',
+		},
+		screen: {
+			flex: 1,
+			backgroundColor: '#ececec',
+			paddingHorizontal: metrics.horizontalPadding,
+			paddingTop: metrics.scale(20, 14, 30),
+			paddingBottom: metrics.scale(20, 16, 28),
+			alignItems: 'center',
+		},
+		headerRow: {
+			width: '100%',
+			maxWidth: metrics.contentMaxWidth,
+			flexDirection: 'row',
+			alignItems: 'center',
+			justifyContent: 'space-between',
+		},
+		backButton: {
+			width: metrics.scale(34, 32, 42),
+			height: metrics.scale(34, 32, 42),
+			borderRadius: metrics.scale(17, 16, 21),
+			backgroundColor: '#e8e8e8',
+			alignItems: 'center',
+			justifyContent: 'center',
+		},
+		backIcon: {
+			fontSize: metrics.scale(26, 20, 28),
+			lineHeight: metrics.scale(26, 20, 28),
+			color: '#616161',
+			marginTop: -2,
+		},
+		headerTitle: {
+			fontSize: metrics.scale(30, 22, 36),
+			fontWeight: '700',
+			letterSpacing: 0.6,
+		},
+		headerSpacer: {
+			width: metrics.scale(34, 32, 42),
+			height: metrics.scale(34, 32, 42),
+		},
+		menuWrap: {
+			width: '100%',
+			maxWidth: metrics.contentMaxWidth,
+			marginTop: metrics.scale(72, 30, 90),
+			gap: metrics.scale(32, 18, 40),
+			paddingLeft: metrics.scale(10, 2, 14),
+		},
+		menuItem: {
+			fontSize: metrics.scale(31, 20, 36),
+			fontWeight: '600',
+		},
+	});
