@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "db:shell": "firebase dataconnect:sql:shell"
   },
   "dependencies": {
     "expo": "^54.0.0",
