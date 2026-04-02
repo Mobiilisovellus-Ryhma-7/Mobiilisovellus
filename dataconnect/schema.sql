@@ -6,15 +6,17 @@ CREATE TABLE IF NOT EXISTS bookings (
   status VARCHAR(50),
   bookingTime TIMESTAMP,
   userId UUID,
-  facilityId UUID,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  sectionId UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (userId) REFERENCES users(id),
+  FOREIGN KEY (sectionId) REFERENCES facility_sections(id)
 );
 
 CREATE TABLE IF NOT EXISTS facilities (
   id UUID PRIMARY KEY,
   name VARCHAR(255),
   address VARCHAR(255),
-  typeId UUID,
   description TEXT,
   openingHours VARCHAR(255),
   contactNumber VARCHAR(20),
@@ -22,10 +24,15 @@ CREATE TABLE IF NOT EXISTS facilities (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS facility_types (
+CREATE TABLE IF NOT EXISTS facility_sections (
   id UUID PRIMARY KEY,
-  name VARCHAR(100),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  facilityId UUID,
+  name VARCHAR(255),          -- "Hall A", "Rink 1", etc.
+  sport VARCHAR(100),         -- "Football", "Ice Hockey", etc.
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (facilityId) REFERENCES facilities(id)
 );
 
 CREATE TABLE IF NOT EXISTS users (
