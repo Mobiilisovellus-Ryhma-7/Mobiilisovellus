@@ -183,7 +183,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 
 const createStyles = (
 	metrics: ReturnType<typeof getResponsiveMetrics>,
-	colors: ReturnType<typeof useTheme>['colors']
+	colors: any
 ) =>
 	StyleSheet.create({
 		safeArea: {
