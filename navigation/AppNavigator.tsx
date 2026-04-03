@@ -13,7 +13,13 @@ import { auth } from '../services/firebase';
 export type RootStackParamList = {
   main: undefined;
   select: undefined;
-  search: undefined;
+  search:
+    | {
+        mode?: 'all' | 'sport' | 'name' | 'status';
+        sport?: string;
+        booked?: boolean;
+      }
+    | undefined;
   login: undefined;
   forgotPassword: undefined;
   register: undefined;
@@ -22,7 +28,12 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export default function AppNavigator() {
+type AppNavigatorProps = {
+  isDarkMode: boolean;
+  onToggleDarkMode: () => void;
+};
+
+export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNavigatorProps) {
   const [isSignedIn, setIsSignedIn] = React.useState(false);
 
   React.useEffect(() => {
@@ -62,16 +73,24 @@ export default function AppNavigator() {
         {({ navigation }) => (
           <Select
             onBack={() => navigation.goBack()}
-            onSearch={() => navigation.navigate('search')}
+            onSearch={(params) =>
+              navigation.navigate(
+                'search',
+                params?.mode === 'sport' || params?.mode === 'status' ? params : undefined
+              )
+            }
           />
         )}
       </Stack.Screen>
 
       <Stack.Screen name="search">
-        {({ navigation }) => (
+        {({ navigation, route }) => (
           <Search
             onBack={() => navigation.goBack()}
             onGoHome={() => navigation.navigate('main')}
+            initialSearchMode={route.params?.mode}
+            initialSport={route.params?.sport}
+            initialBooked={route.params?.booked}
           />
         )}
       </Stack.Screen>
@@ -114,6 +133,8 @@ export default function AppNavigator() {
             onBack={() => navigation.goBack()}
             onGoHome={() => navigation.navigate('main')}
             onSignOut={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={onToggleDarkMode}
           />
         )}
       </Stack.Screen>
