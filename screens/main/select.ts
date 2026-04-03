@@ -23,6 +23,17 @@ type SelectProps = {
   onSearch?: () => void;
 };
 
+type SearchMode = 'all' | 'sport' | 'name' | 'status';
+
+const SEARCH_MODES: SearchMode[] = ['all', 'sport', 'name', 'status'];
+
+const MODE_LABELS: Record<SearchMode, string> = {
+  all: 'Kaikki',
+  sport: 'Laji',
+  name: 'Nimi',
+  status: 'Varaustila',
+};
+
 export default function Select({ onBack, onSearch }: SelectProps) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
