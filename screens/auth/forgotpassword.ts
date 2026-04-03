@@ -151,7 +151,7 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 
 const createStyles = (
 	metrics: ReturnType<typeof getResponsiveMetrics>,
-	colors: ReturnType<typeof useTheme>['colors']
+	colors: any
 ) =>
 	StyleSheet.create({
 		safeArea: {
