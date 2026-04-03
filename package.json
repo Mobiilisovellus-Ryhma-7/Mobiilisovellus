@@ -7,7 +7,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "db:shell": "firebase dataconnect:sql:shell"
+    "db:seed:firestore": "node scripts/seed-firestore-from-sql.js",
+    "db:seed:firestore:dry": "node scripts/seed-firestore-from-sql.js --dry-run",
+    "db:seed:firestore:no-reset": "node scripts/seed-firestore-from-sql.js --no-reset"
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "8.4.4",
@@ -16,6 +18,7 @@
     "expo": "^54.0.0",
     "expo-status-bar": "~3.0.9",
     "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",

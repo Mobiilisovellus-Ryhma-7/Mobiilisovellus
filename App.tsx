@@ -1,12 +1,18 @@
+import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './navigation/AppNavigator';
 import { PaperProvider } from 'react-native-paper';
 import { appTheme } from './navigation/theme';
-import { NavigationContainer } from '@react-navigation/native';
+import FirestoreConnectionTest from './test/FirestoreConnectionTest';
+
+const SHOW_FIRESTORE_TEST = true;
 
 export default function App() {
-  // Data Connect Test // return <DataConnectTest />;
+  //if (SHOW_FIRESTORE_TEST) {
+  //  return <FirestoreConnectionTest />;
+  //}
+
   return (
-    <PaperProvider theme={appTheme}>
+    <PaperProvider theme={appTheme as any}>
       <NavigationContainer>
         <AppNavigator />
       </NavigationContainer>

@@ -1,7 +1,0 @@
-query GetHealthCheck @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
-  bookings(orderBy: [{ bookingTime: DESC }]) {
-    id
-    status
-    bookingTime
-  }
-}
