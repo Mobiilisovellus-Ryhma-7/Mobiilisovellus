@@ -191,8 +191,8 @@ INSERT INTO facility_sections (id, facility_Id, name, sport, description, is_Boo
 ('22222222-2222-2222-2222-000000000090','11111111-1111-1111-1111-000000000030','Kuntosali, Alue 1','Kuntosali','Kuntosali', false);
 
 
-/*INSERT INTO bookings (id, status, booking_time, user_id, section_id) VALUES
+INSERT INTO bookings (id, status, booking_time, user_id, section_id) VALUES
 ('44444444-4444-4444-4444-444444444441', 'pending', NOW(), '11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333331'),
 ('44444444-4444-4444-4444-444444444442', 'confirmed', NOW(), '11111111-1111-1111-1111-111111111112', '33333333-3333-3333-3333-333333333332');
-*/
+
 COMMIT;
