@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import React from 'react';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Platform,
@@ -17,62 +17,25 @@ import {
   Dialog,
   Portal,
   Surface,
+  Switch,
   Text,
+  TextInput,
   useTheme,
 } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import {
+  FacilitySection,
+  listFacilitySections,
+  searchFacilitySectionsByBookingStatus,
+  searchFacilitySectionsByName,
+  searchFacilitySectionsBySport,
+} from '../../services/firebase';
 
 type SearchProps = {
   onBack?: () => void;
 };
 
-type BookingSlot = {
-  id: string;
-  title: string;
-  time: string;
-  bookingDate: string;
-  status: 'open' | 'booked';
-};
-
-type SortMode = 'time' | 'alphabet';
-
-const placeholderSlots: BookingSlot[] = [
-  {
-    id: '1',
-    title: 'Heinäpään halli lohko 1',
-    time: '17:00-18:00',
-    bookingDate: '2026-04-03',
-    status: 'open',
-  },
-  {
-    id: '2',
-    title: 'Heinäpään halli lohko 2',
-    time: '19:00-20:00',
-    bookingDate: '2026-04-03',
-    status: 'booked',
-  },
-  {
-    id: '3',
-    title: 'Heinäpään halli lohko 3',
-    time: '18:00-19:00',
-    bookingDate: '2026-04-04',
-    status: 'open',
-  },
-  {
-    id: '4',
-    title: 'Heinäpään halli lohko 4',
-    time: '19:00-20:00',
-    bookingDate: '2026-04-04',
-    status: 'open',
-  },
-  {
-    id: '5',
-    title: 'Heinäpään halli lohko 5',
-    time: '20:00-21:00',
-    bookingDate: '2026-04-05',
-    status: 'open',
-  },
-];
+type SearchMode = 'all' | 'sport' | 'name' | 'status';
 
 function formatDateAsDbDate(date: Date): string {
   const year = date.getFullYear();
@@ -112,58 +75,87 @@ export default function Search({ onBack }: SearchProps) {
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics), [metrics]);
-  const [selectedSlot, setSelectedSlot] = useState<BookingSlot | null>(null);
-  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
-  const [isSortPickerVisible, setIsSortPickerVisible] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>('time');
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [visibleSlots, setVisibleSlots] = useState<BookingSlot[]>(
-    sortSlots(
-      placeholderSlots.filter((slot) => slot.status === 'open'),
-      'time'
-    )
+
+  const [selectedSection, setSelectedSection] = React.useState<FacilitySection | null>(null);
+  const [sections, setSections] = React.useState<FacilitySection[]>([]);
+  const [searchMode, setSearchMode] = React.useState<SearchMode>('all');
+  const [sportInput, setSportInput] = React.useState('');
+  const [nameInput, setNameInput] = React.useState('');
+  const [bookedOnly, setBookedOnly] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  const runSearch = React.useCallback(
+    async (modeOverride?: SearchMode) => {
+      const mode = modeOverride ?? searchMode;
+      setErrorMessage(null);
+      setIsLoading(true);
+
+      try {
+        let nextSections: FacilitySection[] = [];
+
+        if (mode === 'sport') {
+          const value = sportInput.trim();
+          if (!value) {
+            throw new Error('Syota laji ennen hakua.');
+          }
+          nextSections = await searchFacilitySectionsBySport(value);
+        } else if (mode === 'name') {
+          const value = nameInput.trim();
+          if (!value) {
+            throw new Error('Syota kentan nimi ennen hakua.');
+          }
+          nextSections = await searchFacilitySectionsByName(value);
+        } else if (mode === 'status') {
+          nextSections = await searchFacilitySectionsByBookingStatus(bookedOnly);
+        } else {
+          nextSections = await listFacilitySections();
+        }
+
+        setSections(nextSections);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Haku epaonnistui. Yrita uudelleen.';
+        setErrorMessage(message);
+        setSections([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [bookedOnly, nameInput, searchMode, sportInput]
   );
 
-  const selectedDateLabel = selectedDate.toLocaleDateString('fi-FI', {
-    day: '2-digit',
-    month: '2-digit',
-  }).replace(/\.$/, '');
+  React.useEffect(() => {
+    runSearch('all');
+  }, [runSearch]);
 
-  const applyDateFilter = async (date: Date) => {
-    const slots = await findOpenShiftsByDate(date);
-    setVisibleSlots(sortSlots(slots, sortMode));
+  const openMode = (mode: SearchMode) => {
+    setSearchMode(mode);
+    setErrorMessage(null);
   };
 
-  const applySort = (mode: SortMode) => {
-    setSortMode(mode);
-    setVisibleSlots((current) => sortSlots(current, mode));
-  };
-
-  const sortLabel = sortMode === 'time' ? 'Aika' : 'Aakkoset';
-
-  const slotRows = visibleSlots.map((slot) =>
+  const slotRows = sections.map((section) =>
     React.createElement(
       Pressable,
       {
-        key: slot.id,
+        key: section.id,
         style: styles.slotRow,
-        onPress: () => setSelectedSlot(slot),
+        onPress: () => setSelectedSection(section),
       },
       React.createElement(
         View,
         { style: styles.slotTextWrap },
         React.createElement(Text, {
           style: [styles.slotTitle, { color: colors.onSurface }],
-          children: slot.title,
+          children: section.name ?? 'Nimeton kentta',
         }),
         React.createElement(Text, {
           style: [styles.slotTime, { color: colors.onSurface }],
-          children: slot.time,
+          children: section.isBooked ? 'Varattu' : 'Vapaa',
         })
       ),
       React.createElement(Text, {
         style: styles.chevron,
-        children: '›',
+        children: '>',
       })
     )
   );
@@ -194,7 +186,7 @@ export default function Search({ onBack }: SearchProps) {
           React.createElement(
             Pressable,
             { style: styles.backButton, onPress: onBack },
-            React.createElement(Text, { style: styles.backIcon, children: '‹' })
+            React.createElement(Text, { style: styles.backIcon, children: '<' })
           ),
           React.createElement(View, { style: styles.headerSpacer })
         ),
@@ -216,25 +208,81 @@ export default function Search({ onBack }: SearchProps) {
             compact: true,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
-            onPress: () => setIsDatePickerVisible(true),
-            children: `pvm ${selectedDateLabel}`,
+            selected: searchMode === 'all',
+            onPress: () => openMode('all'),
+            children: 'Kaikki',
           }),
           React.createElement(Chip, {
             mode: 'flat',
             compact: true,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
-            children: 'laji',
+            selected: searchMode === 'sport',
+            onPress: () => openMode('sport'),
+            children: 'Laji',
           }),
           React.createElement(Chip, {
             mode: 'flat',
             compact: true,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
-            onPress: () => setIsSortPickerVisible(true),
-            children: sortLabel,
+            selected: searchMode === 'name',
+            onPress: () => openMode('name'),
+            children: 'Nimi',
+          }),
+          React.createElement(Chip, {
+            mode: 'flat',
+            compact: true,
+            style: styles.filterChip,
+            textStyle: styles.filterChipText,
+            selected: searchMode === 'status',
+            onPress: () => openMode('status'),
+            children: 'Varaustila',
           })
-        )
+        ),
+        searchMode === 'sport'
+          ? React.createElement(TextInput, {
+              mode: 'outlined',
+              dense: true,
+              label: 'Laji',
+              value: sportInput,
+              onChangeText: setSportInput,
+              style: styles.textInput,
+            })
+          : null,
+        searchMode === 'name'
+          ? React.createElement(TextInput, {
+              mode: 'outlined',
+              dense: true,
+              label: 'Kentan nimi',
+              value: nameInput,
+              onChangeText: setNameInput,
+              style: styles.textInput,
+            })
+          : null,
+        searchMode === 'status'
+          ? React.createElement(
+              View,
+              { style: styles.statusRow },
+              React.createElement(Text, {
+                style: styles.statusText,
+                children: bookedOnly ? 'Nayta varatut' : 'Nayta vapaat',
+              }),
+              React.createElement(Switch, {
+                value: bookedOnly,
+                onValueChange: setBookedOnly,
+              })
+            )
+          : null,
+        React.createElement(Button, {
+          mode: 'contained',
+          onPress: () => runSearch(),
+          style: styles.searchButton,
+          contentStyle: styles.searchButtonContent,
+          labelStyle: styles.searchButtonLabel,
+          disabled: isLoading,
+          children: 'Hae kentat',
+        })
       ),
       React.createElement(
         Surface,
@@ -244,7 +292,25 @@ export default function Search({ onBack }: SearchProps) {
           children: React.createElement(
             ScrollView,
             { contentContainerStyle: styles.listContent },
-            ...listContent
+            errorMessage
+              ? React.createElement(Text, {
+                  style: styles.errorText,
+                  children: errorMessage,
+                })
+              : null,
+            isLoading
+              ? React.createElement(ActivityIndicator, {
+                  size: 'small',
+                  style: styles.loading,
+                })
+              : null,
+            !isLoading && sections.length === 0
+              ? React.createElement(Text, {
+                  style: styles.emptyText,
+                  children: 'Ei tuloksia valituilla hakuehdoilla.',
+                })
+              : null,
+            ...slotRows
           ),
         }
       ),
@@ -357,8 +423,8 @@ export default function Search({ onBack }: SearchProps) {
         children: React.createElement(
           Dialog,
           {
-            visible: !!selectedSlot,
-            onDismiss: () => setSelectedSlot(null),
+            visible: !!selectedSection,
+            onDismiss: () => setSelectedSection(null),
             style: styles.dialog,
             children: React.createElement(
               View,
@@ -368,39 +434,39 @@ export default function Search({ onBack }: SearchProps) {
                 { style: styles.modalTopRow },
                 React.createElement(Text, {
                   style: styles.modalHall,
-                  children: selectedSlot?.title ?? '',
+                  children: selectedSection?.name ?? 'Nimeton kentta',
                 }),
                 React.createElement(Text, {
                   style: styles.modalTime,
-                  children: selectedSlot?.time ?? '',
+                  children: selectedSection?.isBooked ? 'Varattu' : 'Vapaa',
                 })
               ),
               React.createElement(Text, {
                 style: styles.modalSubLine,
-                children: 'Laji',
+                children: `Laji: ${selectedSection?.sport ?? 'Ei tiedossa'}`,
               }),
               React.createElement(
                 View,
                 { style: styles.mapPlaceholder },
                 React.createElement(Text, {
                   style: styles.mapPin,
-                  children: '📍',
+                  children: 'PIN',
                 })
               ),
               React.createElement(Text, {
                 style: styles.modalSubLine,
-                children: 'Sallitut lajit',
+                children: `Kuvaus: ${selectedSection?.description ?? 'Ei kuvausta'}`,
               }),
               React.createElement(Text, {
                 style: styles.modalSubLine,
-                children: 'Mitat + koko',
+                children: `Facility ID: ${selectedSection?.facilityId ?? '-'}`,
               }),
               React.createElement(Button, {
                 mode: 'contained',
                 style: styles.reserveButton,
                 contentStyle: styles.reserveButtonContent,
                 labelStyle: styles.reserveButtonLabel,
-                onPress: () => setSelectedSlot(null),
+                onPress: () => setSelectedSection(null),
                 children: 'Varaa vuoro',
               })
             ),
@@ -449,10 +515,10 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       justifyContent: 'center',
     },
     backIcon: {
-      fontSize: metrics.scale(26, 20, 28),
-      lineHeight: metrics.scale(26, 20, 28),
+      fontSize: metrics.scale(22, 18, 28),
+      lineHeight: metrics.scale(22, 18, 28),
       color: '#616161',
-      marginTop: -2,
+      marginTop: -1,
     },
     headerSpacer: {
       width: metrics.scale(34, 32, 42),
@@ -473,7 +539,8 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
     filtersRow: {
       marginTop: metrics.scale(18, 12, 24),
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-start',
       alignItems: 'center',
       gap: metrics.scale(8, 6, 12),
     },
@@ -487,6 +554,32 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       fontWeight: '600',
       color: '#616161',
     },
+    textInput: {
+      marginTop: metrics.scale(10, 8, 14),
+      backgroundColor: '#ffffff',
+    },
+    statusRow: {
+      marginTop: metrics.scale(10, 8, 14),
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    statusText: {
+      color: '#475569',
+      fontSize: metrics.scale(14, 12, 18),
+      fontWeight: '600',
+    },
+    searchButton: {
+      marginTop: metrics.scale(12, 10, 16),
+      borderRadius: metrics.scale(12, 10, 16),
+    },
+    searchButtonContent: {
+      height: metrics.scale(40, 36, 48),
+    },
+    searchButtonLabel: {
+      fontSize: metrics.scale(16, 14, 20),
+      fontWeight: '700',
+    },
     listSurface: {
       flex: 1,
       width: '100%',
@@ -498,33 +591,20 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
     listContent: {
       paddingBottom: metrics.scale(12, 8, 20),
     },
-    emptyText: {
-      color: '#616161',
-      textAlign: 'center',
-      paddingVertical: metrics.scale(20, 14, 28),
-      fontSize: metrics.scale(16, 13, 20),
+    loading: {
+      marginVertical: metrics.scale(14, 10, 18),
+    },
+    errorText: {
+      color: '#b91c1c',
+      fontSize: metrics.scale(13, 11, 16),
       fontWeight: '500',
+      marginTop: metrics.scale(8, 6, 10),
     },
-    modalBackdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(15, 23, 42, 0.45)',
-      justifyContent: 'center',
-      paddingHorizontal: metrics.horizontalPadding,
-    },
-    modalPickerCard: {
-      backgroundColor: '#f7f9fc',
-      borderRadius: metrics.scale(24, 18, 30),
-      padding: metrics.scale(16, 12, 20),
-      gap: metrics.scale(12, 10, 16),
-    },
-    modalPickerTitle: {
-      color: '#0f172a',
-      fontSize: metrics.scale(18, 16, 22),
-      fontWeight: '700',
-    },
-    modalPickerActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
+    emptyText: {
+      color: '#475569',
+      fontSize: metrics.scale(14, 12, 17),
+      marginTop: metrics.scale(12, 8, 18),
+      textAlign: 'center',
     },
     slotRow: {
       minHeight: metrics.scale(66, 52, 78),
@@ -549,7 +629,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       marginTop: 2,
     },
     chevron: {
-      fontSize: metrics.scale(28, 18, 32),
+      fontSize: metrics.scale(20, 16, 26),
       color: '#c8c8c8',
       marginLeft: 8,
     },
@@ -600,10 +680,12 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       backgroundColor: '#d9d9d9',
       justifyContent: 'center',
       alignItems: 'flex-start',
-      paddingLeft: metrics.scale(30, 20, 38),
+      paddingLeft: metrics.scale(24, 18, 30),
     },
     mapPin: {
-      fontSize: metrics.scale(30, 22, 38),
+      fontSize: metrics.scale(18, 14, 22),
+      color: '#475569',
+      fontWeight: '700',
     },
     reserveButton: {
       marginTop: metrics.scale(18, 12, 24),

@@ -1,12 +1,12 @@
 import { FirebaseApp, FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import {
-  executeMutation,
-  executeQuery,
-  getDataConnect,
-  mutationRef,
-  queryRef,
-} from 'firebase/data-connect';
+  collection,
+  getDocs,
+  getFirestore,
+  limit,
+  query,
+} from 'firebase/firestore';
 
 // Generic env var collector
 const getEnvVars = (keys: string[]) =>
@@ -41,94 +41,133 @@ const firebaseConfig: FirebaseOptions = {
 
 const app: FirebaseApp | null = !firebaseInitError && getApps().length === 0
   ? initializeApp(firebaseConfig)
-  : getApp() ?? null;
+  : getApps().length > 0
+    ? getApp()
+    : null;
 
 export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app) : null;
 
-const dataConnectVars = getEnvVars([
-  'FIREBASE_DATA_CONNECT_LOCATION',
-  'FIREBASE_DATA_CONNECT_SERVICE',
-  'FIREBASE_DATA_CONNECT_CONNECTOR',
-  'FIREBASE_DATA_CONNECT_HEALTH_QUERY',
-  'FIREBASE_DATA_CONNECT_HEALTH_MUTATION',
-]);
-
-const DEFAULT_CONNECTION_QUERY = 'ListAllFacilities';
-
-function getRequiredDataConnectConfig() {
-  const requiredKeys = [
-    'FIREBASE_DATA_CONNECT_LOCATION',
-    'FIREBASE_DATA_CONNECT_SERVICE',
-    'FIREBASE_DATA_CONNECT_CONNECTOR',
-  ] as const;
-
-  const missingKeys = requiredKeys.filter((key) => !dataConnectVars[key]);
-
-  if (missingKeys.length > 0) {
-    throw new Error(
-      `Missing Data Connect env vars: ${missingKeys.join(', ')}. Add them to .env and restart Expo.`
-    );
-  }
-
-  return {
-    location: dataConnectVars.FIREBASE_DATA_CONNECT_LOCATION!,
-    service: dataConnectVars.FIREBASE_DATA_CONNECT_SERVICE!,
-    connector: dataConnectVars.FIREBASE_DATA_CONNECT_CONNECTOR!,
-    healthQuery: dataConnectVars.FIREBASE_DATA_CONNECT_HEALTH_QUERY ?? DEFAULT_CONNECTION_QUERY,
-    healthMutation: dataConnectVars.FIREBASE_DATA_CONNECT_HEALTH_MUTATION,
-  };
-}
-
-export type DataConnectHealthCheckResult = {
+export type FirestoreHealthCheckResult = {
   ok: true;
   projectId: string;
-  connector: string;
-  location: string;
-  service: string;
-  queryName: string;
-  queryData: unknown;
-  mutationName?: string;
-  mutationData?: unknown;
+  collection: string;
+  sampleCount: number;
 };
 
-export async function runDataConnectHealthCheck(): Promise<DataConnectHealthCheckResult> {
+export type FacilitySection = {
+  id: string;
+  facilityId: string | null;
+  name: string | null;
+  sport: string | null;
+  description: string | null;
+  isBooked: boolean | null;
+  createdAt: string | null;
+};
+
+const FACILITY_SECTIONS_COLLECTION =
+  process.env.EXPO_PUBLIC_FIRESTORE_FACILITY_SECTIONS_COLLECTION || 'facility_sections';
+
+function getFirestoreClient() {
   if (firebaseInitError) {
     throw new Error(firebaseInitError);
   }
 
-  if (!app) {
+  if (!db) {
     throw new Error('Firebase app is not initialized.');
   }
 
-  const config = getRequiredDataConnectConfig();
-  const dc = getDataConnect(app, {
-    location: config.location,
-    service: config.service,
-    connector: config.connector,
-  });
+  return db;
+}
 
-  const queryResult = await executeQuery(
-    queryRef<Record<string, unknown>>(dc, config.healthQuery)
-  );
+function asNullableString(value: unknown) {
+  return typeof value === 'string' ? value : null;
+}
 
-  let mutationData: unknown;
-  if (config.healthMutation) {
-    const mutationResult = await executeMutation(
-      mutationRef<Record<string, unknown>>(dc, config.healthMutation)
-    );
-    mutationData = mutationResult.data;
+function toIsoDate(value: unknown): string | null {
+  if (!value) {
+    return null;
   }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toDate' in value &&
+    typeof (value as { toDate: unknown }).toDate === 'function'
+  ) {
+    return ((value as { toDate: () => Date }).toDate()).toISOString();
+  }
+
+  return asNullableString(value);
+}
+
+function mapSection(id: string, data: Record<string, unknown>): FacilitySection {
+  return {
+    id,
+    facilityId: asNullableString(data.facilityId ?? data.facility_id),
+    name: asNullableString(data.name),
+    sport: asNullableString(data.sport),
+    description: asNullableString(data.description),
+    isBooked: typeof data.isBooked === 'boolean'
+      ? data.isBooked
+      : typeof data.is_booked === 'boolean'
+        ? data.is_booked
+        : null,
+    createdAt: toIsoDate(data.createdAt ?? data.created_at),
+  };
+}
+
+async function fetchAllFacilitySections() {
+  const firestore = getFirestoreClient();
+  const snapshot = await getDocs(collection(firestore, FACILITY_SECTIONS_COLLECTION));
+
+  return snapshot.docs.map((doc) => mapSection(doc.id, doc.data()));
+}
+
+function normalize(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export async function listFacilitySections() {
+  return fetchAllFacilitySections();
+}
+
+export async function searchFacilitySectionsBySport(sport: string) {
+  const normalizedSport = normalize(sport);
+  const sections = await fetchAllFacilitySections();
+  return sections.filter((section) => normalize(section.sport ?? '') === normalizedSport);
+}
+
+export async function searchFacilitySectionsByName(name: string) {
+  const normalizedName = normalize(name);
+  const sections = await fetchAllFacilitySections();
+  return sections.filter((section) => normalize(section.name ?? '').includes(normalizedName));
+}
+
+export async function searchFacilitySectionsByBookingStatus(isBooked: boolean) {
+  const sections = await fetchAllFacilitySections();
+  return sections.filter((section) => section.isBooked === isBooked);
+}
+
+export async function runFirestoreHealthCheck(): Promise<FirestoreHealthCheckResult> {
+  if (firebaseInitError) {
+    throw new Error(firebaseInitError);
+  }
+
+  const firestore = getFirestoreClient();
+  const snapshot = await getDocs(
+    query(collection(firestore, FACILITY_SECTIONS_COLLECTION), limit(1))
+  );
 
   return {
     ok: true,
     projectId: firebaseVars.FIREBASE_PROJECT_ID!,
-    connector: config.connector,
-    location: config.location,
-    service: config.service,
-    queryName: config.healthQuery,
-    queryData: queryResult.data,
-    mutationName: config.healthMutation,
-    mutationData,
+    collection: FACILITY_SECTIONS_COLLECTION,
+    sampleCount: snapshot.size,
   };
 }
 
