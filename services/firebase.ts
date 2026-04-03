@@ -91,6 +91,90 @@ export type DataConnectHealthCheckResult = {
   mutationData?: unknown;
 };
 
+export type FacilitySection = {
+  id: string;
+  facilityId: string | null;
+  name: string | null;
+  sport: string | null;
+  description: string | null;
+  isBooked: boolean | null;
+  createdAt: string | null;
+};
+
+type FacilitySectionsQueryData = {
+  facilitySections?: FacilitySection[] | null;
+};
+
+function getDataConnectClient() {
+  if (firebaseInitError) {
+    throw new Error(firebaseInitError);
+  }
+
+  if (!app) {
+    throw new Error('Firebase app is not initialized.');
+  }
+
+  const config = getRequiredDataConnectConfig();
+
+  return getDataConnect(app, {
+    location: config.location,
+    service: config.service,
+    connector: config.connector,
+  });
+}
+
+function getFacilitySections(data: FacilitySectionsQueryData | undefined) {
+  return data?.facilitySections ?? [];
+}
+
+export async function listFacilitySections() {
+  const dc = getDataConnectClient();
+  const result = await executeQuery(
+    queryRef<FacilitySectionsQueryData>(dc, 'ListFacilitySections')
+  );
+
+  return getFacilitySections(result.data);
+}
+
+export async function searchFacilitySectionsBySport(sport: string) {
+  const dc = getDataConnectClient();
+  const result = await executeQuery(
+    queryRef<FacilitySectionsQueryData, { sport: string }>(
+      dc,
+      'SearchFacilitySectionsBySport',
+      { sport }
+    )
+  );
+
+  return getFacilitySections(result.data);
+}
+
+export async function searchFacilitySectionsByName(name: string) {
+  const dc = getDataConnectClient();
+  const result = await executeQuery(
+    queryRef<FacilitySectionsQueryData, { name: string }>(
+      dc,
+      'SearchFacilitySectionsByName',
+      { name }
+    )
+  );
+
+  return getFacilitySections(result.data);
+}
+
+export async function searchFacilitySectionsByBookingStatus(isBooked: boolean) {
+  const dc = getDataConnectClient();
+  const result = await executeQuery(
+    queryRef<FacilitySectionsQueryData, { isBooked: boolean }>(
+      dc,
+      'SearchFacilitySectionsByBookingStatus',
+      { isBooked }
+    )
+  );
+
+  return getFacilitySections(result.data);
+}
+
 export async function runDataConnectHealthCheck(): Promise<DataConnectHealthCheckResult> {
   if (firebaseInitError) {
     throw new Error(firebaseInitError);

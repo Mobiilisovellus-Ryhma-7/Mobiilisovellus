@@ -6,19 +6,79 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Button, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, Switch, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import {
+  listFacilitySections,
+  searchFacilitySectionsByBookingStatus,
+  searchFacilitySectionsByName,
+  searchFacilitySectionsBySport,
+} from '../../services/firebase';
 
 type SelectProps = {
   onBack?: () => void;
   onSearch?: () => void;
 };
 
+type SearchMode = 'all' | 'sport' | 'name' | 'status';
+
+const MODE_LABELS: Record<SearchMode, string> = {
+  all: 'Kaikki',
+  sport: 'Laji',
+  name: 'Nimi',
+  status: 'Varaustila',
+};
+
+const SEARCH_MODES: SearchMode[] = ['all', 'sport', 'name', 'status'];
+
 export default function Select({ onBack, onSearch }: SelectProps) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+  const [searchMode, setSearchMode] = React.useState<SearchMode>('all');
+  const [sport, setSport] = React.useState('');
+  const [name, setName] = React.useState('');
+  const [bookedOnly, setBookedOnly] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [resultCount, setResultCount] = React.useState<number | null>(null);
+
+  const handleSearch = React.useCallback(async () => {
+    setErrorMessage(null);
+    setResultCount(null);
+    setIsLoading(true);
+
+    try {
+      let sections;
+
+      if (searchMode === 'sport') {
+        const sportValue = sport.trim();
+        if (!sportValue) {
+          throw new Error('Syötä laji ennen hakua.');
+        }
+        sections = await searchFacilitySectionsBySport(sportValue);
+      } else if (searchMode === 'name') {
+        const nameValue = name.trim();
+        if (!nameValue) {
+          throw new Error('Syötä kentän nimi ennen hakua.');
+        }
+        sections = await searchFacilitySectionsByName(nameValue);
+      } else if (searchMode === 'status') {
+        sections = await searchFacilitySectionsByBookingStatus(bookedOnly);
+      } else {
+        sections = await listFacilitySections();
+      }
+
+      setResultCount(sections.length);
+      onSearch?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Haku epäonnistui. Yritä uudelleen.';
+      setErrorMessage(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [bookedOnly, name, onSearch, searchMode, sport]);
 
   return React.createElement(
     SafeAreaView,
@@ -46,30 +106,89 @@ export default function Select({ onBack, onSearch }: SelectProps) {
         { style: styles.formArea },
         React.createElement(
           View,
-          { style: styles.inputLine },
-          React.createElement(Text, {
-            style: styles.inputPlaceholder,
-            children: 'Valitse laji',
-          })
+          { style: styles.modeRow },
+          ...SEARCH_MODES.map((mode) =>
+            React.createElement(
+              Pressable,
+              {
+                key: mode,
+                style: [
+                  styles.modeButton,
+                  searchMode === mode ? styles.modeButtonActive : null,
+                ],
+                onPress: () => setSearchMode(mode),
+              },
+              React.createElement(Text, {
+                style: [
+                  styles.modeButtonText,
+                  searchMode === mode ? styles.modeButtonTextActive : null,
+                ],
+                children: MODE_LABELS[mode],
+              })
+            )
+          )
         ),
-        React.createElement(
-          View,
-          { style: styles.inputLine },
-          React.createElement(Text, {
-            style: styles.inputPlaceholder,
-            children: 'Valitse päivämäärä',
-          })
-        )
+        searchMode === 'sport'
+          ? React.createElement(TextInput, {
+              mode: 'outlined',
+              label: 'Laji',
+              value: sport,
+              onChangeText: setSport,
+              style: styles.textInput,
+            })
+          : null,
+        searchMode === 'name'
+          ? React.createElement(TextInput, {
+              mode: 'outlined',
+              label: 'Kentän nimi',
+              value: name,
+              onChangeText: setName,
+              style: styles.textInput,
+            })
+          : null,
+        searchMode === 'status'
+          ? React.createElement(
+              View,
+              { style: styles.statusRow },
+              React.createElement(Text, {
+                style: styles.statusLabel,
+                children: 'Näytä vain varatut kentät',
+              }),
+              React.createElement(Switch, {
+                value: bookedOnly,
+                onValueChange: setBookedOnly,
+              })
+            )
+          : null,
+        errorMessage
+          ? React.createElement(Text, {
+              style: styles.errorText,
+              children: errorMessage,
+            })
+          : null,
+        resultCount !== null
+          ? React.createElement(Text, {
+              style: styles.resultText,
+              children: `Löydetyt kentät: ${resultCount}`,
+            })
+          : null
       ),
       React.createElement(
         View,
         { style: styles.bottomArea },
+        isLoading
+          ? React.createElement(ActivityIndicator, {
+              size: 'small',
+              style: styles.loader,
+            })
+          : null,
         React.createElement(Button, {
           mode: 'contained',
-          onPress: onSearch,
+          onPress: handleSearch,
           style: styles.searchButton,
           contentStyle: styles.searchButtonContent,
           labelStyle: styles.searchButtonText,
+          disabled: isLoading,
           children: 'Hae',
         })
       )
@@ -136,21 +255,65 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       backgroundColor: '#f7f9fc',
       borderRadius: metrics.scale(24, 18, 30),
     },
-    inputLine: {
-      borderBottomWidth: 1,
-      borderBottomColor: '#d9d9d9',
-      paddingBottom: metrics.scale(10, 8, 14),
+    modeRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: metrics.scale(8, 6, 10),
     },
-    inputPlaceholder: {
-      color: '#b7b7b7',
-      fontSize: metrics.scale(19, 15, 24),
-      fontWeight: '400',
+    modeButton: {
+      paddingHorizontal: metrics.scale(12, 10, 16),
+      paddingVertical: metrics.scale(8, 6, 12),
+      borderRadius: metrics.scale(12, 10, 14),
+      borderWidth: 1,
+      borderColor: '#cfd8e3',
+      backgroundColor: '#ffffff',
+    },
+    modeButtonActive: {
+      backgroundColor: '#dbeafe',
+      borderColor: '#60a5fa',
+    },
+    modeButtonText: {
+      fontSize: metrics.scale(14, 12, 18),
+      color: '#334155',
+      fontWeight: '500',
+    },
+    modeButtonTextActive: {
+      color: '#1d4ed8',
+      fontWeight: '700',
+    },
+    textInput: {
+      backgroundColor: '#ffffff',
+    },
+    statusRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    statusLabel: {
+      fontSize: metrics.scale(15, 13, 18),
+      color: '#334155',
+      fontWeight: '500',
+      flexShrink: 1,
+      paddingRight: 10,
+    },
+    errorText: {
+      color: '#b91c1c',
+      fontSize: metrics.scale(13, 11, 15),
+      fontWeight: '500',
+    },
+    resultText: {
+      color: '#0f766e',
+      fontSize: metrics.scale(14, 12, 16),
+      fontWeight: '600',
     },
     bottomArea: {
       marginTop: 'auto',
       alignItems: 'center',
       width: '100%',
       maxWidth: metrics.contentMaxWidth,
+    },
+    loader: {
+      marginBottom: metrics.scale(10, 8, 14),
     },
     searchButton: {
       width: '100%',

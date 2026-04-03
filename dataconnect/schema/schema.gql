@@ -23,6 +23,7 @@ type FacilitySection @table(name: "facility_sections") {
   sport: String
   description: String
   createdAt: Timestamp
+  isBooked: Boolean
 }
 
 type Booking @table(name: "bookings") {

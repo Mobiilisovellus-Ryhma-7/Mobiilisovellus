@@ -60,3 +60,12 @@ Then use in your app:
 - Mutations: `Create*`, `Update*`, `Delete*`, `Insert*`
 
 Example: `listAllFacilities.gql` → operation name `ListAllFacilities`
+
+## Facility Section Operations
+
+The connector now includes operations for listing and searching `facility_sections`:
+
+- `ListFacilitySections`
+- `SearchFacilitySectionsBySport(sport: String!)`
+- `SearchFacilitySectionsByName(name: String!)`
+- `SearchFacilitySectionsByBookingStatus(isBooked: Boolean!)`

@@ -1,0 +1,11 @@
+query SearchFacilitySectionsBySport($sport: String!) @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  facilitySections(where: { sport: { eq: $sport } }) {
+    id
+    facilityId
+    name
+    sport
+    description
+    isBooked
+    createdAt
+  }
+}
