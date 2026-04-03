@@ -1,5 +1,6 @@
 import {
 	createUserWithEmailAndPassword,
+	sendPasswordResetEmail,
 	signInWithEmailAndPassword,
 	signOut,
 	updatePassword,
@@ -79,5 +80,10 @@ export async function changeCurrentUserPassword(newPassword: string): Promise<vo
 	}
 
 	await updatePassword(currentUser, newPassword);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+	const authClient = getAuthClient();
+	await sendPasswordResetEmail(authClient, email.trim());
 }
 

@@ -6,6 +6,7 @@ import Select from '../screens/main/select';
 import Search from '../screens/main/search';
 import Login from '../screens/auth/login';
 import Register from '../screens/auth/register';
+import ForgotPassword from '../screens/auth/forgotpassword';
 import Profile from '../screens/user/profile';
 import { auth } from '../services/firebase';
 
@@ -14,6 +15,7 @@ export type RootStackParamList = {
   select: undefined;
   search: undefined;
   login: undefined;
+  forgotPassword: undefined;
   register: undefined;
   profile: undefined;
 };
@@ -79,8 +81,18 @@ export default function AppNavigator() {
           <Login
             onBack={() => navigation.goBack()}
             onGoHome={() => navigation.navigate('main')}
-            onLogin={() => navigation.navigate('profile')}
+            onForgotPassword={() => navigation.navigate('forgotPassword')}
+            onLogin={() => navigation.navigate('main')}
             onRegister={() => navigation.navigate('register')}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="forgotPassword">
+        {({ navigation }) => (
+          <ForgotPassword
+            onBack={() => navigation.goBack()}
+            onGoHome={() => navigation.navigate('main')}
           />
         )}
       </Stack.Screen>
