@@ -15,6 +15,7 @@
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/native": "^7.2.0",
     "@react-navigation/native-stack": "^7.14.7",
+    "datetimepicker": "^0.1.39",
     "expo": "^54.0.0",
     "expo-status-bar": "~3.0.9",
     "firebase": "^12.10.0",
