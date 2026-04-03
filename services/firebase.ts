@@ -141,7 +141,25 @@ export async function listFacilitySections() {
 export async function searchFacilitySectionsBySport(sport: string) {
   const normalizedSport = normalize(sport);
   const sections = await fetchAllFacilitySections();
-  return sections.filter((section) => normalize(section.sport ?? '') === normalizedSport);
+  return sections.filter((section) => {
+    const sectionSport = normalize(section.sport ?? '');
+
+    if (!sectionSport || !normalizedSport) {
+      return false;
+    }
+
+    if (sectionSport === normalizedSport) {
+      return true;
+    }
+
+    // Handle values like "Jalkapallo / Futsal" or comma-separated sports.
+    const tokens = sectionSport
+      .split(/[,;/|]/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    return tokens.includes(normalizedSport) || sectionSport.includes(normalizedSport);
+  });
 }
 
 export async function searchFacilitySectionsByName(name: string) {
