@@ -1,4 +1,7 @@
 import React from 'react';
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import {
   ActivityIndicator,
   Image,
@@ -35,6 +38,8 @@ type SearchProps = {
   onBack?: () => void;
 };
 
+type SearchMode = 'all' | 'sport' | 'name' | 'status';
+
 
 
 function formatDateAsDbDate(date: Date): string {
@@ -44,30 +49,21 @@ function formatDateAsDbDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-async function findOpenShiftsByDate(date: Date): Promise<BookingSlot[]> {
-  const dbDateValue = formatDateAsDbDate(date);
-
-  // TODO: Replace this placeholder with real DB query:
-  // WHERE bookingDate = dbDateValue::DATE AND status = 'open'
-  return placeholderSlots.filter(
-    (slot) => slot.bookingDate === dbDateValue && slot.status === 'open'
-  );
-}
-
-function getStartMinutes(timeRange: string): number {
-  const [start] = timeRange.split('-');
-  const [hours, minutes] = start.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function sortSlots(slots: BookingSlot[], mode: SortMode): BookingSlot[] {
-  const next = [...slots];
-
-  if (mode === 'alphabet') {
-    return next.sort((a, b) => a.title.localeCompare(b.title, 'fi'));
+function matchesDateFilter(section: FacilitySection, dateFilter: string | null): boolean {
+  if (!dateFilter) {
+    return true;
   }
 
-  return next.sort((a, b) => getStartMinutes(a.time) - getStartMinutes(b.time));
+  if (!section.createdAt) {
+    return false;
+  }
+
+  const parsedDate = new Date(section.createdAt);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return false;
+  }
+
+  return formatDateAsDbDate(parsedDate) === dateFilter;
 }
 
 export default function Search({ onBack }: SearchProps) {
@@ -84,6 +80,9 @@ export default function Search({ onBack }: SearchProps) {
   const [bookedOnly, setBookedOnly] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [isDatePickerVisible, setIsDatePickerVisible] = React.useState(false);
+  const [selectedDate, setSelectedDate] = React.useState(new Date());
+  const [activeDateFilter, setActiveDateFilter] = React.useState<string | null>(null);
 
   const runSearch = React.useCallback(
     async (modeOverride?: SearchMode) => {
@@ -133,7 +132,16 @@ export default function Search({ onBack }: SearchProps) {
     setErrorMessage(null);
   };
 
-  const slotRows = sections.map((section) =>
+  const applyDateFilter = React.useCallback((date: Date) => {
+    setActiveDateFilter(formatDateAsDbDate(date));
+  }, []);
+
+  const filteredSections = React.useMemo(
+    () => sections.filter((section) => matchesDateFilter(section, activeDateFilter)),
+    [activeDateFilter, sections]
+  );
+
+  const slotRows = filteredSections.map((section) =>
     React.createElement(
       Pressable,
       {
@@ -282,6 +290,12 @@ export default function Search({ onBack }: SearchProps) {
           labelStyle: styles.searchButtonLabel,
           disabled: isLoading,
           children: 'Hae kentat',
+        }),
+        React.createElement(Button, {
+          mode: 'outlined',
+          onPress: () => setIsDatePickerVisible(true),
+          style: styles.dateButton,
+          children: activeDateFilter ? `Paiva: ${activeDateFilter}` : 'Valitse paiva',
         })
       ),
       React.createElement(
@@ -304,7 +318,7 @@ export default function Search({ onBack }: SearchProps) {
                   style: styles.loading,
                 })
               : null,
-            !isLoading && sections.length === 0
+            !isLoading && filteredSections.length === 0
               ? React.createElement(Text, {
                   style: styles.emptyText,
                   children: 'Ei tuloksia valituilla hakuehdoilla.',
@@ -344,12 +358,15 @@ export default function Search({ onBack }: SearchProps) {
               locale: 'fi-FI',
               display: Platform.OS === 'ios' ? 'inline' : 'calendar',
               themeVariant: 'light',
-              onChange: async (_, date) => {
-                if (!date) {
+              onChange: (event: DateTimePickerEvent, date?: Date) => {
+                if (!date || event.type === 'dismissed') {
+                  if (Platform.OS !== 'ios') {
+                    setIsDatePickerVisible(false);
+                  }
                   return;
                 }
                 setSelectedDate(date);
-                await applyDateFilter(date);
+                applyDateFilter(date);
                 if (Platform.OS !== 'ios') {
                   setIsDatePickerVisible(false);
                 }
@@ -361,58 +378,6 @@ export default function Search({ onBack }: SearchProps) {
               React.createElement(Button, {
                 mode: 'text',
                 onPress: () => setIsDatePickerVisible(false),
-                children: 'Sulje',
-              })
-            )
-          )
-        )
-      ),
-      React.createElement(
-        Modal,
-        {
-          visible: isSortPickerVisible,
-          transparent: true,
-          animationType: 'fade',
-          onRequestClose: () => setIsSortPickerVisible(false),
-        },
-        React.createElement(
-          Pressable,
-          {
-            style: styles.modalBackdrop,
-            onPress: () => setIsSortPickerVisible(false),
-          },
-          React.createElement(
-            Pressable,
-            {
-              style: styles.modalPickerCard,
-              onPress: () => undefined,
-            },
-            React.createElement(Text, {
-              style: styles.modalPickerTitle,
-              children: 'Lajittelu',
-            }),
-            React.createElement(Button, {
-              mode: sortMode === 'time' ? 'contained' : 'outlined',
-              onPress: () => {
-                applySort('time');
-                setIsSortPickerVisible(false);
-              },
-              children: 'Aika',
-            }),
-            React.createElement(Button, {
-              mode: sortMode === 'alphabet' ? 'contained' : 'outlined',
-              onPress: () => {
-                applySort('alphabet');
-                setIsSortPickerVisible(false);
-              },
-              children: 'Aakkoset',
-            }),
-            React.createElement(
-              View,
-              { style: styles.modalPickerActions },
-              React.createElement(Button, {
-                mode: 'text',
-                onPress: () => setIsSortPickerVisible(false),
                 children: 'Sulje',
               })
             )
@@ -580,6 +545,11 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       fontSize: metrics.scale(16, 14, 20),
       fontWeight: '700',
     },
+    dateButton: {
+      marginTop: metrics.scale(10, 8, 14),
+      alignSelf: 'flex-start',
+      borderRadius: metrics.scale(10, 8, 14),
+    },
     listSurface: {
       flex: 1,
       width: '100%',
@@ -632,6 +602,30 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       fontSize: metrics.scale(20, 16, 26),
       color: '#c8c8c8',
       marginLeft: 8,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: metrics.horizontalPadding,
+    },
+    modalPickerCard: {
+      width: '100%',
+      maxWidth: metrics.isTablet ? 460 : 360,
+      backgroundColor: '#f7f9fc',
+      borderRadius: metrics.scale(24, 18, 30),
+      padding: metrics.scale(16, 12, 20),
+      gap: metrics.scale(12, 10, 16),
+    },
+    modalPickerTitle: {
+      color: '#0f172a',
+      fontSize: metrics.scale(18, 16, 22),
+      fontWeight: '700',
+    },
+    modalPickerActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
     },
     dialog: {
       backgroundColor: 'transparent',
