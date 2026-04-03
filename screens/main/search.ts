@@ -35,7 +35,7 @@ type SearchProps = {
   onBack?: () => void;
 };
 
-type SearchMode = 'all' | 'sport' | 'name' | 'status';
+
 
 function formatDateAsDbDate(date: Date): string {
   const year = date.getFullYear();
