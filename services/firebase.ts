@@ -114,6 +114,8 @@ function mapSection(id: string, data: Record<string, unknown>): FacilitySection 
     description: asNullableString(data.description),
     isBooked: typeof data.isBooked === 'boolean'
       ? data.isBooked
+      : typeof data.is_Booked === 'boolean'
+        ? data.is_Booked
       : typeof data.is_booked === 'boolean'
         ? data.is_booked
         : null,
