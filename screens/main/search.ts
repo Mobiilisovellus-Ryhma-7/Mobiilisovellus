@@ -35,39 +35,39 @@ type BookingSlot = {
 };
 
 type SortMode = 'time' | 'alphabet';
-
+// Haku - vapaat vuorot
 const placeholderSlots: BookingSlot[] = [
   {
     id: '1',
-    title: 'Heinäpään halli lohko 1',
+    title: 'AA Heinäpään halli lohko 1',
     time: '17:00-18:00',
     bookingDate: '2026-04-03',
     status: 'open',
   },
   {
     id: '2',
-    title: 'Heinäpään halli lohko 2',
+    title: 'AA Heinäpään halli lohko 2',
     time: '19:00-20:00',
     bookingDate: '2026-04-03',
     status: 'booked',
   },
   {
     id: '3',
-    title: 'Heinäpään halli lohko 3',
+    title: 'BB Heinäpään halli lohko 3',
     time: '18:00-19:00',
     bookingDate: '2026-04-04',
     status: 'open',
   },
   {
     id: '4',
-    title: 'Heinäpään halli lohko 4',
+    title: 'CC Heinäpään halli lohko 4',
     time: '19:00-20:00',
     bookingDate: '2026-04-04',
     status: 'open',
   },
   {
     id: '5',
-    title: 'Heinäpään halli lohko 5',
+    title: 'DD Heinäpään halli lohko 5',
     time: '20:00-21:00',
     bookingDate: '2026-04-05',
     status: 'open',

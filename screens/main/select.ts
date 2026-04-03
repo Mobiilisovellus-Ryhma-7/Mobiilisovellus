@@ -16,7 +16,7 @@ type SelectProps = {
   onBack?: () => void;
   onSearch?: () => void;
 };
-
+// Haku
 export default function Select({ onBack, onSearch }: SelectProps) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();

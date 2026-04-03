@@ -25,9 +25,9 @@ export default function MainPage({
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics), [metrics]);
-
+// Pääsivu
   return React.createElement(
-    SafeAreaView,
+    SafeAreaView, 
     { style: [styles.safeArea, { backgroundColor: colors.background }] },
     React.createElement(
       View,
