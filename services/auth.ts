@@ -1,5 +1,8 @@
 import {
 	createUserWithEmailAndPassword,
+	deleteUser,
+	EmailAuthProvider,
+	reauthenticateWithCredential,
 	sendPasswordResetEmail,
 	signInWithEmailAndPassword,
 	signOut,
@@ -7,10 +10,15 @@ import {
 	updateProfile,
 	type User,
 } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db, firebaseInitError } from './firebase';
 
 export type RegisterInput = {
+	email: string;
+	password: string;
+};
+
+export type DeleteAccountVerificationInput = {
 	email: string;
 	password: string;
 };
@@ -85,5 +93,40 @@ export async function changeCurrentUserPassword(newPassword: string): Promise<vo
 export async function requestPasswordReset(email: string): Promise<void> {
 	const authClient = getAuthClient();
 	await sendPasswordResetEmail(authClient, email.trim());
+}
+
+export async function deleteCurrentUserAccount(
+	verification: DeleteAccountVerificationInput
+): Promise<void> {
+	const authClient = getAuthClient();
+	const firestore = getDbClient();
+	const currentUser = authClient.currentUser;
+	const currentEmail = currentUser?.email;
+
+	if (!currentUser) {
+		throw new Error('Sinun täytyy kirjautua sisään ennen tilin poistamista.');
+	}
+
+	if (!currentEmail) {
+		throw new Error('Tilin poistaminen vaatii sähköposti-kirjautumisen.');
+	}
+
+	const email = verification.email.trim();
+	const password = verification.password;
+
+	if (!email || !password) {
+		throw new Error('Anna sähköposti ja salasana tilin poistamista varten.');
+	}
+
+	if (email.toLowerCase() !== currentEmail.toLowerCase()) {
+		throw new Error('Syötetty sähköposti ei vastaa kirjautunutta käyttäjää.');
+	}
+
+	const credential = EmailAuthProvider.credential(email, password);
+	await reauthenticateWithCredential(currentUser, credential);
+
+	await deleteDoc(doc(firestore, 'users', currentUser.uid));
+	await deleteUser(currentUser);
+	await signOut(authClient);
 }
 

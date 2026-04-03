@@ -13,7 +13,11 @@ import {
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { auth } from '../../services/firebase';
-import { changeCurrentUserPassword, signOutUser } from '../../services/auth';
+import {
+	changeCurrentUserPassword,
+	deleteCurrentUserAccount,
+	signOutUser,
+} from '../../services/auth';
 
 type ProfileProps = {
 	onBack?: () => void;
@@ -28,8 +32,13 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 	const userEmail = auth?.currentUser?.email ?? 'Käyttäjänimi';
 	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
 	const [isSigningOut, setIsSigningOut] = React.useState(false);
+	const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+	const [deleteError, setDeleteError] = React.useState<string | null>(null);
+	const [deleteEmail, setDeleteEmail] = React.useState('');
+	const [deletePassword, setDeletePassword] = React.useState('');
 	const [showPasswordForm, setShowPasswordForm] = React.useState(false);
+	const [showDeleteModal, setShowDeleteModal] = React.useState(false);
 	const [newPassword, setNewPassword] = React.useState('');
 	const [confirmPassword, setConfirmPassword] = React.useState('');
 	const [isChangingPassword, setIsChangingPassword] = React.useState(false);
@@ -45,6 +54,21 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 	const closePasswordModal = React.useCallback(() => {
 		setShowPasswordForm(false);
 	}, []);
+
+	const openDeleteModal = React.useCallback(() => {
+		setDeleteError(null);
+		setDeleteEmail(auth?.currentUser?.email ?? '');
+		setDeletePassword('');
+		setShowDeleteModal(true);
+	}, []);
+
+	const closeDeleteModal = React.useCallback(() => {
+		if (isDeletingAccount) {
+			return;
+		}
+
+		setShowDeleteModal(false);
+	}, [isDeletingAccount]);
 
 	const handleSignOut = React.useCallback(async () => {
 		setIsSigningOut(true);
@@ -88,6 +112,31 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 			setIsChangingPassword(false);
 		}
 	}, [confirmPassword, newPassword]);
+
+	const handleDeleteAccount = React.useCallback(async () => {
+		setDeleteError(null);
+
+		if (!deleteEmail.trim() || !deletePassword) {
+			setDeleteError('Anna sähköposti ja salasana ennen tilin poistamista.');
+			return;
+		}
+
+		setIsDeletingAccount(true);
+
+		try {
+			await deleteCurrentUserAccount({
+				email: deleteEmail.trim(),
+				password: deletePassword,
+			});
+			setShowDeleteModal(false);
+			onSignOut?.();
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Tilin poistaminen epäonnistui.';
+			setDeleteError(message);
+		} finally {
+			setIsDeletingAccount(false);
+		}
+	}, [deleteEmail, deletePassword, onSignOut]);
 
 	return React.createElement(
 		SafeAreaView,
@@ -146,6 +195,14 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 					style: [styles.menuItem, { color: colors.onSurface }],
 					children: 'Omat varaukset',
 				}),
+				React.createElement(
+					Pressable,
+					{ onPress: openDeleteModal },
+					React.createElement(Text, {
+						style: [styles.menuItemDanger, { color: '#b91c1c' }],
+						children: 'Poista käyttäjätili',
+					})
+				),
 				errorMessage
 					? React.createElement(Text, {
 						style: styles.errorText,
@@ -236,6 +293,72 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 						)
 					)
 				)
+			),
+			React.createElement(
+				Modal,
+				{
+					visible: showDeleteModal,
+					transparent: true,
+					animationType: 'fade',
+					onRequestClose: closeDeleteModal,
+				},
+				React.createElement(
+					Pressable,
+					{ style: styles.modalBackdrop, onPress: closeDeleteModal },
+					React.createElement(
+						Pressable,
+						{ style: styles.modalCard, onPress: () => undefined },
+						React.createElement(Text, {
+							style: styles.modalTitle,
+							children: 'Poista käyttäjätili',
+						}),
+						React.createElement(Text, {
+							style: styles.modalDescription,
+							children: 'Haluatko varmasti poistaa tilisi? Tätä toimintoa ei voi perua.',
+						}),
+						React.createElement(TextInput, {
+							mode: 'outlined',
+							label: 'Sähköposti',
+							value: deleteEmail,
+							onChangeText: setDeleteEmail,
+							style: styles.passwordInput,
+							autoCapitalize: 'none',
+							keyboardType: 'email-address',
+						}),
+						React.createElement(TextInput, {
+							mode: 'outlined',
+							label: 'Salasana',
+							value: deletePassword,
+							onChangeText: setDeletePassword,
+							secureTextEntry: true,
+							style: styles.passwordInput,
+						}),
+						deleteError
+							? React.createElement(Text, {
+								style: styles.errorText,
+								children: deleteError,
+							})
+							: null,
+						React.createElement(
+							View,
+							{ style: styles.modalActions },
+							React.createElement(Button, {
+								mode: 'text',
+								onPress: closeDeleteModal,
+								disabled: isDeletingAccount,
+								children: 'Peruuta',
+							}),
+							React.createElement(Button, {
+								mode: 'contained',
+								onPress: handleDeleteAccount,
+								loading: isDeletingAccount,
+								disabled: isDeletingAccount,
+								buttonColor: '#b91c1c',
+								children: 'Poista tili',
+							})
+						)
+					)
+				)
 			)
 		)
 	);
@@ -302,6 +425,10 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			fontSize: metrics.scale(31, 20, 36),
 			fontWeight: '600',
 		},
+		menuItemDanger: {
+			fontSize: metrics.scale(28, 19, 34),
+			fontWeight: '700',
+		},
 		modalBackdrop: {
 			flex: 1,
 			backgroundColor: 'rgba(15, 23, 42, 0.45)',
@@ -326,6 +453,11 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			fontSize: metrics.scale(20, 17, 24),
 			fontWeight: '700',
 			color: '#0f172a',
+		},
+		modalDescription: {
+			fontSize: metrics.scale(14, 12, 18),
+			lineHeight: metrics.scale(20, 18, 24),
+			color: '#475569',
 		},
 		modalActions: {
 			marginTop: metrics.scale(4, 2, 8),

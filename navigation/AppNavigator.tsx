@@ -102,7 +102,7 @@ export default function AppNavigator() {
           <Register
             onBack={() => navigation.goBack()}
             onGoHome={() => navigation.navigate('main')}
-            onRegister={() => navigation.navigate('profile')}
+            onRegister={() => navigation.navigate('main')}
             onGoLogin={() => navigation.navigate('login')}
           />
         )}
