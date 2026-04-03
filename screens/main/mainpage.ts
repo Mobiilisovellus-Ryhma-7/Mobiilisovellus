@@ -7,7 +7,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Button, Surface, Text, useTheme } from 'react-native-paper';
+import { Button, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 
 type MainPageProps = {
@@ -25,39 +25,6 @@ export default function MainPage({
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics), [metrics]);
-
-  const navItems = [
-    React.createElement(Surface, {
-      key: 'nav-1',
-      style: styles.navItem,
-      children: React.createElement(View, { style: styles.navInnerSquare }),
-    }),
-    React.createElement(Surface, {
-      key: 'nav-2',
-      style: styles.navItem,
-      children: React.createElement(View, { style: styles.navInnerSquare }),
-    }),
-    React.createElement(Surface, {
-      key: 'nav-3',
-      style: styles.navItem,
-      children: React.createElement(View, { style: styles.navInnerSquare }),
-    }),
-    React.createElement(Surface, {
-      key: 'nav-4',
-      style: styles.navItem,
-      children: React.createElement(View, { style: styles.navInnerSquare }),
-    }),
-    React.createElement(
-      Pressable,
-      {
-        key: 'nav-profile',
-        style: styles.navItem,
-        onPress: onOpenProfile,
-      },
-      React.createElement(View, { style: styles.profileHead }),
-      React.createElement(View, { style: styles.profileBody })
-    ),
-  ];
 
   return React.createElement(
     SafeAreaView,
@@ -99,7 +66,19 @@ export default function MainPage({
           })
         )
       ),
-      React.createElement(View, { style: styles.bottomNav }, ...navItems)
+      React.createElement(
+        View,
+        { style: styles.bottomNav },
+        React.createElement(
+          Pressable,
+          {
+            style: styles.navItem,
+            onPress: onOpenProfile,
+          },
+          React.createElement(View, { style: styles.profileHead }),
+          React.createElement(View, { style: styles.profileBody })
+        )
+      )
     )
   );
 }
@@ -161,12 +140,12 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       fontWeight: '600',
     },
     bottomNav: {
-      width: '100%',
+      width: 'auto',
       maxWidth: metrics.contentMaxWidth,
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: metrics.scale(8, 2, 24),
+      alignSelf: 'center',
     },
     navItem: {
       width: metrics.scale(46, 40, 58),

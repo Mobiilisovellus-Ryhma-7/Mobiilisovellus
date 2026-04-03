@@ -105,6 +105,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
             React.createElement(DateTimePicker, {
               value: selectedDate ?? new Date(),
               mode: 'date',
+              locale: 'fi-FI',
               display: Platform.OS === 'ios' ? 'inline' : 'calendar',
               themeVariant: 'light',
               onChange: (_, date) => {
