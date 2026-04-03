@@ -36,6 +36,7 @@ import {
 
 type SearchProps = {
   onBack?: () => void;
+  onGoHome?: () => void;
 };
 
 type SearchMode = 'all' | 'sport' | 'name' | 'status';
@@ -66,7 +67,7 @@ function matchesDateFilter(section: FacilitySection, dateFilter: string | null):
   return formatDateAsDbDate(parsedDate) === dateFilter;
 }
 
-export default function Search({ onBack }: SearchProps) {
+export default function Search({ onBack, onGoHome }: SearchProps) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
@@ -198,11 +199,15 @@ export default function Search({ onBack }: SearchProps) {
           ),
           React.createElement(View, { style: styles.headerSpacer })
         ),
-        React.createElement(Image, {
-          source: require('../../assets/dynamic-sport-hall-logo.png'),
-          style: styles.logo,
-          resizeMode: 'contain',
-        }),
+        React.createElement(
+          Pressable,
+          { onPress: onGoHome },
+          React.createElement(Image, {
+            source: require('../../assets/dynamic-sport-hall-logo.png'),
+            style: styles.logo,
+            resizeMode: 'contain',
+          })
+        ),
         React.createElement(Text, {
           style: [styles.title, { color: colors.onSurface }],
           variant: 'titleMedium',

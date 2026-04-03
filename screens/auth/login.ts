@@ -12,12 +12,14 @@ import {
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import { signInUser } from '../../services/auth';
 
 type LoginProps = {
 	onBack?: () => void;
 	onForgotPassword?: () => void;
 	onRegister?: () => void;
 	onLogin?: () => void;
+	onGoHome?: () => void;
 };
 
 export default function Login({
@@ -25,6 +27,7 @@ export default function Login({
 	onForgotPassword,
 	onRegister,
 	onLogin,
+	onGoHome,
 }: LoginProps) {
 	const { colors } = useTheme();
 	const { width } = useWindowDimensions();
@@ -33,6 +36,37 @@ export default function Login({
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [secureEntry, setSecureEntry] = useState(true);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+	const handleLogin = React.useCallback(async () => {
+		const trimmedEmail = email.trim();
+
+		if (!trimmedEmail) {
+			setErrorMessage('Syötä sähköposti.');
+			return;
+		}
+
+		if (!password) {
+			setErrorMessage('Syötä salasana.');
+			return;
+		}
+
+		setIsSubmitting(true);
+		setErrorMessage(null);
+
+		try {
+			await signInUser({
+				email: trimmedEmail,
+				password,
+			});
+			onLogin?.();
+		} catch (error) {
+			setErrorMessage(error instanceof Error ? error.message : 'Kirjautuminen epäonnistui.');
+		} finally {
+			setIsSubmitting(false);
+		}
+	}, [email, onLogin, password]);
 
 	return React.createElement(
 		SafeAreaView,
@@ -65,11 +99,15 @@ export default function Login({
 				),
 				React.createElement(View, { style: styles.headerSpacer })
 			),
-			React.createElement(Image, {
-				source: require('../../assets/dynamic-sport-hall-logo.png'),
-				style: styles.logo,
-				resizeMode: 'contain',
-			}),
+			React.createElement(
+				Pressable,
+				{ onPress: onGoHome },
+				React.createElement(Image, {
+					source: require('../../assets/dynamic-sport-hall-logo.png'),
+					style: styles.logo,
+					resizeMode: 'contain',
+				})
+			),
 			React.createElement(Text, {
 				style: styles.brand,
 				children: 'Hallille',
@@ -120,12 +158,21 @@ export default function Login({
 				}),
 			}),
 
+				errorMessage
+					? React.createElement(Text, {
+						style: styles.errorText,
+						children: errorMessage,
+					})
+					: null,
+
 			React.createElement(Button, {
 				mode: 'contained',
-				onPress: onLogin,
+					onPress: handleLogin,
 				style: styles.loginButton,
 				contentStyle: styles.loginButtonContent,
 				labelStyle: styles.loginButtonLabel,
+					loading: isSubmitting,
+					disabled: isSubmitting,
 				children: 'Kirjaudu sisään',
 			}),
 
@@ -274,5 +321,11 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			color: '#0d8bf2',
 			fontSize: metrics.scale(16, 13, 20),
 			fontWeight: '700',
+		},
+		errorText: {
+			marginTop: metrics.scale(14, 10, 18),
+			color: '#b91c1c',
+			fontSize: metrics.scale(14, 12, 18),
+			fontWeight: '600',
 		},
 	});
