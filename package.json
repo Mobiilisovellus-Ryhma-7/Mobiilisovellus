@@ -12,6 +12,7 @@
     "db:seed:firestore:no-reset": "node scripts/seed-firestore-from-sql.js --no-reset"
   },
   "dependencies": {
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/native": "^7.2.0",
     "@react-navigation/native-stack": "^7.14.7",
     "expo": "^54.0.0",

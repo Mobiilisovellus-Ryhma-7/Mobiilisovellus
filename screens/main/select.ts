@@ -1,5 +1,8 @@
 import React from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
+  Platform,
+  Modal,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -35,6 +38,8 @@ export default function Select({ onBack, onSearch }: SelectProps) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
   const styles = React.useMemo(() => createStyles(metrics), [metrics]);
   const [searchMode, setSearchMode] = React.useState<SearchMode>('all');
   const [sport, setSport] = React.useState('');
@@ -79,6 +84,14 @@ export default function Select({ onBack, onSearch }: SelectProps) {
       setIsLoading(false);
     }
   }, [bookedOnly, name, onSearch, searchMode, sport]);
+
+  const formattedDate = selectedDate
+    ? selectedDate.toLocaleDateString('fi-FI', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : 'Valitse päivämäärä';
 
   return React.createElement(
     SafeAreaView,
@@ -172,6 +185,52 @@ export default function Select({ onBack, onSearch }: SelectProps) {
               children: `Löydetyt kentät: ${resultCount}`,
             })
           : null
+      ),
+      React.createElement(
+        Modal,
+        {
+          visible: isCalendarOpen,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setIsCalendarOpen(false),
+        },
+        React.createElement(
+          View,
+          { style: styles.modalBackdrop },
+          React.createElement(Pressable, {
+            style: styles.modalDismissLayer,
+            onPress: () => setIsCalendarOpen(false),
+          }),
+          React.createElement(
+            View,
+            { style: styles.modalCard },
+            React.createElement(Text, {
+              style: styles.modalTitle,
+              children: 'Valitse päivämäärä',
+            }),
+            React.createElement(DateTimePicker, {
+              value: selectedDate ?? new Date(),
+              mode: 'date',
+              locale: 'fi-FI',
+              display: Platform.OS === 'ios' ? 'inline' : 'calendar',
+              themeVariant: 'light',
+              onChange: (_, date) => {
+                if (date) {
+                  setSelectedDate(date);
+                }
+              },
+            }),
+            React.createElement(
+              View,
+              { style: styles.modalActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsCalendarOpen(false),
+                children: 'Sulje',
+              })
+            )
+          )
+        )
       ),
       React.createElement(
         View,
@@ -305,6 +364,33 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       color: '#0f766e',
       fontSize: metrics.scale(14, 12, 16),
       fontWeight: '600',
+    },
+    selectedValue: {
+      color: '#000000',
+    },
+    modalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: metrics.horizontalPadding,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    },
+    modalDismissLayer: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    modalCard: {
+      backgroundColor: '#f7f9fc',
+      borderRadius: metrics.scale(24, 18, 30),
+      padding: metrics.scale(16, 12, 20),
+      gap: metrics.scale(12, 10, 16),
+    },
+    modalTitle: {
+      color: '#0f172a',
+      fontSize: metrics.scale(18, 16, 22),
+      fontWeight: '700',
+    },
+    modalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
     },
     bottomArea: {
       marginTop: 'auto',

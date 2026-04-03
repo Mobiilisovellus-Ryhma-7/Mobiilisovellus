@@ -25,6 +25,33 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "@react-native-community/datetimepicker",
+        {
+          "android": {
+            "datePicker": {
+              "textColorPrimary": {
+                "light": "#000000",
+                "dark": "#000000"
+              },
+              "textColorSecondary": {
+                "light": "#000000",
+                "dark": "#000000"
+              },
+              "textColorPrimaryInverse": {
+                "light": "#000000",
+                "dark": "#000000"
+              },
+              "textColorSecondaryInverse": {
+                "light": "#000000",
+                "dark": "#000000"
+              }
+            }
+          }
+        }
+      ]
+    ]
   }
 }
