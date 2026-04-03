@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   Image,
+  Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -27,15 +30,82 @@ type BookingSlot = {
   id: string;
   title: string;
   time: string;
+  bookingDate: string;
+  status: 'open' | 'booked';
 };
 
+type SortMode = 'time' | 'alphabet';
+
 const placeholderSlots: BookingSlot[] = [
-  { id: '1', title: 'Heinäpään halli lohko 1', time: '17:00-18:00' },
-  { id: '2', title: 'Heinäpään halli lohko 2', time: '17:00-18:00' },
-  { id: '3', title: 'Heinäpään halli lohko 3', time: '17:00-18:00' },
-  { id: '4', title: 'Heinäpään halli lohko 4', time: '17:00-18:00' },
-  { id: '5', title: 'Heinäpään halli lohko 5', time: '17:00-18:00' },
+  {
+    id: '1',
+    title: 'Heinäpään halli lohko 1',
+    time: '17:00-18:00',
+    bookingDate: '2026-04-03',
+    status: 'open',
+  },
+  {
+    id: '2',
+    title: 'Heinäpään halli lohko 2',
+    time: '19:00-20:00',
+    bookingDate: '2026-04-03',
+    status: 'booked',
+  },
+  {
+    id: '3',
+    title: 'Heinäpään halli lohko 3',
+    time: '18:00-19:00',
+    bookingDate: '2026-04-04',
+    status: 'open',
+  },
+  {
+    id: '4',
+    title: 'Heinäpään halli lohko 4',
+    time: '19:00-20:00',
+    bookingDate: '2026-04-04',
+    status: 'open',
+  },
+  {
+    id: '5',
+    title: 'Heinäpään halli lohko 5',
+    time: '20:00-21:00',
+    bookingDate: '2026-04-05',
+    status: 'open',
+  },
 ];
+
+function formatDateAsDbDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+async function findOpenShiftsByDate(date: Date): Promise<BookingSlot[]> {
+  const dbDateValue = formatDateAsDbDate(date);
+
+  // TODO: Replace this placeholder with real DB query:
+  // WHERE bookingDate = dbDateValue::DATE AND status = 'open'
+  return placeholderSlots.filter(
+    (slot) => slot.bookingDate === dbDateValue && slot.status === 'open'
+  );
+}
+
+function getStartMinutes(timeRange: string): number {
+  const [start] = timeRange.split('-');
+  const [hours, minutes] = start.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function sortSlots(slots: BookingSlot[], mode: SortMode): BookingSlot[] {
+  const next = [...slots];
+
+  if (mode === 'alphabet') {
+    return next.sort((a, b) => a.title.localeCompare(b.title, 'fi'));
+  }
+
+  return next.sort((a, b) => getStartMinutes(a.time) - getStartMinutes(b.time));
+}
 
 export default function Search({ onBack }: SearchProps) {
   const { colors } = useTheme();
@@ -43,8 +113,35 @@ export default function Search({ onBack }: SearchProps) {
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics), [metrics]);
   const [selectedSlot, setSelectedSlot] = useState<BookingSlot | null>(null);
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [isSortPickerVisible, setIsSortPickerVisible] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('time');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [visibleSlots, setVisibleSlots] = useState<BookingSlot[]>(
+    sortSlots(
+      placeholderSlots.filter((slot) => slot.status === 'open'),
+      'time'
+    )
+  );
 
-  const slotRows = placeholderSlots.map((slot) =>
+  const selectedDateLabel = selectedDate.toLocaleDateString('fi-FI', {
+    day: '2-digit',
+    month: '2-digit',
+  }).replace(/\.$/, '');
+
+  const applyDateFilter = async (date: Date) => {
+    const slots = await findOpenShiftsByDate(date);
+    setVisibleSlots(sortSlots(slots, sortMode));
+  };
+
+  const applySort = (mode: SortMode) => {
+    setSortMode(mode);
+    setVisibleSlots((current) => sortSlots(current, mode));
+  };
+
+  const sortLabel = sortMode === 'time' ? 'Aika' : 'Aakkoset';
+
+  const slotRows = visibleSlots.map((slot) =>
     React.createElement(
       Pressable,
       {
@@ -70,6 +167,17 @@ export default function Search({ onBack }: SearchProps) {
       })
     )
   );
+
+  const listContent =
+    slotRows.length > 0
+      ? slotRows
+      : [
+          React.createElement(Text, {
+            key: 'empty-slots',
+            style: styles.emptyText,
+            children: 'Ei vapaita vuoroja valitulla päivällä.',
+          }),
+        ];
 
   return React.createElement(
     SafeAreaView,
@@ -108,7 +216,8 @@ export default function Search({ onBack }: SearchProps) {
             compact: true,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
-            children: 'pvm',
+            onPress: () => setIsDatePickerVisible(true),
+            children: `pvm ${selectedDateLabel}`,
           }),
           React.createElement(Chip, {
             mode: 'flat',
@@ -122,7 +231,8 @@ export default function Search({ onBack }: SearchProps) {
             compact: true,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
-            children: 'järjestä',
+            onPress: () => setIsSortPickerVisible(true),
+            children: sortLabel,
           })
         )
       ),
@@ -134,9 +244,114 @@ export default function Search({ onBack }: SearchProps) {
           children: React.createElement(
             ScrollView,
             { contentContainerStyle: styles.listContent },
-            ...slotRows
+            ...listContent
           ),
         }
+      ),
+      React.createElement(
+        Modal,
+        {
+          visible: isDatePickerVisible,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setIsDatePickerVisible(false),
+        },
+        React.createElement(
+          Pressable,
+          {
+            style: styles.modalBackdrop,
+            onPress: () => setIsDatePickerVisible(false),
+          },
+          React.createElement(
+            Pressable,
+            {
+              style: styles.modalPickerCard,
+              onPress: () => undefined,
+            },
+            React.createElement(Text, {
+              style: styles.modalPickerTitle,
+              children: 'Valitse päivämäärä',
+            }),
+            React.createElement(DateTimePicker, {
+              value: selectedDate,
+              mode: 'date',
+              locale: 'fi-FI',
+              display: Platform.OS === 'ios' ? 'inline' : 'calendar',
+              themeVariant: 'light',
+              onChange: async (_, date) => {
+                if (!date) {
+                  return;
+                }
+                setSelectedDate(date);
+                await applyDateFilter(date);
+                if (Platform.OS !== 'ios') {
+                  setIsDatePickerVisible(false);
+                }
+              },
+            }),
+            React.createElement(
+              View,
+              { style: styles.modalPickerActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsDatePickerVisible(false),
+                children: 'Sulje',
+              })
+            )
+          )
+        )
+      ),
+      React.createElement(
+        Modal,
+        {
+          visible: isSortPickerVisible,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setIsSortPickerVisible(false),
+        },
+        React.createElement(
+          Pressable,
+          {
+            style: styles.modalBackdrop,
+            onPress: () => setIsSortPickerVisible(false),
+          },
+          React.createElement(
+            Pressable,
+            {
+              style: styles.modalPickerCard,
+              onPress: () => undefined,
+            },
+            React.createElement(Text, {
+              style: styles.modalPickerTitle,
+              children: 'Lajittelu',
+            }),
+            React.createElement(Button, {
+              mode: sortMode === 'time' ? 'contained' : 'outlined',
+              onPress: () => {
+                applySort('time');
+                setIsSortPickerVisible(false);
+              },
+              children: 'Aika',
+            }),
+            React.createElement(Button, {
+              mode: sortMode === 'alphabet' ? 'contained' : 'outlined',
+              onPress: () => {
+                applySort('alphabet');
+                setIsSortPickerVisible(false);
+              },
+              children: 'Aakkoset',
+            }),
+            React.createElement(
+              View,
+              { style: styles.modalPickerActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsSortPickerVisible(false),
+                children: 'Sulje',
+              })
+            )
+          )
+        )
       ),
       React.createElement(Portal, {
         children: React.createElement(
@@ -282,6 +497,34 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
     },
     listContent: {
       paddingBottom: metrics.scale(12, 8, 20),
+    },
+    emptyText: {
+      color: '#616161',
+      textAlign: 'center',
+      paddingVertical: metrics.scale(20, 14, 28),
+      fontSize: metrics.scale(16, 13, 20),
+      fontWeight: '500',
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      justifyContent: 'center',
+      paddingHorizontal: metrics.horizontalPadding,
+    },
+    modalPickerCard: {
+      backgroundColor: '#f7f9fc',
+      borderRadius: metrics.scale(24, 18, 30),
+      padding: metrics.scale(16, 12, 20),
+      gap: metrics.scale(12, 10, 16),
+    },
+    modalPickerTitle: {
+      color: '#0f172a',
+      fontSize: metrics.scale(18, 16, 22),
+      fontWeight: '700',
+    },
+    modalPickerActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
     },
     slotRow: {
       minHeight: metrics.scale(66, 52, 78),
