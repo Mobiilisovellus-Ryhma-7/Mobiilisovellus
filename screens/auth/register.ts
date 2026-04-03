@@ -12,20 +12,53 @@ import {
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import { registerUser } from '../../services/auth';
 
 type RegisterProps = {
 	onBack?: () => void;
 	onRegister?: () => void;
 	onGoLogin?: () => void;
+	onGoHome?: () => void;
 };
 
-export default function Register({ onBack, onRegister, onGoLogin }: RegisterProps) {
+export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: RegisterProps) {
 	const { colors } = useTheme();
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+	const handleRegister = React.useCallback(async () => {
+		const trimmedEmail = email.trim();
+
+		if (!trimmedEmail) {
+			setErrorMessage('Syötä sähköposti.');
+			return;
+		}
+
+		if (password.length < 6) {
+			setErrorMessage('Salasanan on oltava vähintään 6 merkkiä.');
+			return;
+		}
+
+		setIsSubmitting(true);
+		setErrorMessage(null);
+
+		try {
+			await registerUser({
+				email: trimmedEmail,
+				password,
+			});
+			onRegister?.();
+		} catch (error) {
+			setErrorMessage(error instanceof Error ? error.message : 'Rekisteröinti epäonnistui.');
+		} finally {
+			setIsSubmitting(false);
+		}
+	}, [email, onRegister, password]);
 
 	return React.createElement(
 		SafeAreaView,
@@ -58,11 +91,15 @@ export default function Register({ onBack, onRegister, onGoLogin }: RegisterProp
 				),
 				React.createElement(View, { style: styles.headerSpacer })
 			),
-			React.createElement(Image, {
-				source: require('../../assets/dynamic-sport-hall-logo.png'),
-				style: styles.logo,
-				resizeMode: 'contain',
-			}),
+			React.createElement(
+				Pressable,
+				{ onPress: onGoHome },
+				React.createElement(Image, {
+					source: require('../../assets/dynamic-sport-hall-logo.png'),
+					style: styles.logo,
+					resizeMode: 'contain',
+				})
+			),
 			React.createElement(Text, {
 				style: styles.brand,
 				children: 'Hallille',
@@ -104,12 +141,21 @@ export default function Register({ onBack, onRegister, onGoLogin }: RegisterProp
 				contentStyle: styles.inputContent,
 			}),
 
+				errorMessage
+					? React.createElement(Text, {
+						style: styles.errorText,
+						children: errorMessage,
+					})
+					: null,
+
 			React.createElement(Button, {
 				mode: 'contained',
-				onPress: onRegister,
+					onPress: handleRegister,
 				style: styles.registerButton,
 				contentStyle: styles.registerButtonContent,
 				labelStyle: styles.registerButtonLabel,
+					loading: isSubmitting,
+					disabled: isSubmitting,
 				children: 'Rekisteröidy',
 			}),
 
@@ -249,5 +295,11 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			color: '#0d8bf2',
 			fontSize: metrics.scale(16, 13, 20),
 			fontWeight: '700',
+		},
+		errorText: {
+			marginTop: metrics.scale(14, 10, 18),
+			color: '#b91c1c',
+			fontSize: metrics.scale(14, 12, 18),
+			fontWeight: '600',
 		},
 	});

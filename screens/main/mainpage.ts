@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../services/firebase';
 
 type MainPageProps = {
   onOpenFacilities?: () => void;
@@ -25,6 +27,20 @@ export default function MainPage({
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+  const [isSignedIn, setIsSignedIn] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!auth) {
+      setIsSignedIn(false);
+      return undefined;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsSignedIn(!!user);
+    });
+
+    return unsubscribe;
+  }, []);
 // Pääsivu
   return React.createElement(
     SafeAreaView, 
@@ -56,14 +72,19 @@ export default function MainPage({
             labelStyle: styles.buttonText,
             children: 'Vapaat kentät',
           }),
-          React.createElement(Button, {
-            mode: 'contained',
-            onPress: onOpenLogin,
-            style: styles.primaryButton,
-            contentStyle: styles.buttonContent,
-            labelStyle: styles.buttonText,
-            children: 'Kirjaudu',
-          })
+          !isSignedIn
+            ? React.createElement(Button, {
+                mode: 'contained',
+                onPress: onOpenLogin,
+                style: styles.primaryButton,
+                contentStyle: styles.buttonContent,
+                labelStyle: styles.buttonText,
+                children: 'Kirjaudu',
+              })
+            : React.createElement(Text, {
+                style: styles.signedInText,
+                children: 'Olet kirjautunut sisään',
+              })
         )
       ),
       React.createElement(
@@ -138,6 +159,12 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       color: '#ffffff',
       fontSize: metrics.scale(18, 15, 22),
       fontWeight: '600',
+    },
+    signedInText: {
+      color: '#64748b',
+      fontSize: metrics.scale(15, 13, 18),
+      fontWeight: '600',
+      marginTop: metrics.scale(4, 2, 6),
     },
     bottomNav: {
       width: 'auto',
