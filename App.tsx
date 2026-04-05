@@ -1,9 +1,10 @@
-import React from 'react';
+import * as React from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './navigation/AppNavigator';
 import { PaperProvider } from 'react-native-paper';
 import { darkAppTheme, lightAppTheme } from './navigation/theme';
 import FirestoreConnectionTest from './test/FirestoreConnectionTest';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const SHOW_FIRESTORE_TEST = true;
 
@@ -31,13 +32,15 @@ export default function App() {
  // }
 
   return (
-    <PaperProvider theme={paperTheme as any}>
-      <NavigationContainer theme={navigationTheme}>
-        <AppNavigator
-          isDarkMode={isDarkMode}
-          onToggleDarkMode={() => setIsDarkMode((prev) => !prev)}
-        />
-      </NavigationContainer>
-    </PaperProvider>
+    <SafeAreaProvider>
+      <PaperProvider theme={paperTheme as any}>
+        <NavigationContainer theme={navigationTheme}>
+          <AppNavigator
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={() => setIsDarkMode((prev: boolean) => !prev)}
+          />
+        </NavigationContainer>
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }

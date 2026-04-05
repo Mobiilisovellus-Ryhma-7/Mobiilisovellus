@@ -8,7 +8,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   View,
@@ -25,6 +24,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import {
   FacilitySection,
   listFacilitySections,
@@ -301,7 +301,7 @@ export default function Search({
         ];
 
   return React.createElement(
-    SafeAreaView,
+    Screen,
     { style: [styles.safeArea, { backgroundColor: colors.background }] },
     React.createElement(
       View,

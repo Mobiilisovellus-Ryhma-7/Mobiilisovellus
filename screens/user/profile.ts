@@ -1,17 +1,17 @@
-import React from 'react';
+import * as React from 'react';
 import {
 	Image,
 	KeyboardAvoidingView,
 	Modal,
 	Platform,
 	Pressable,
-	SafeAreaView,
 	StyleSheet,
 	View,
 	useWindowDimensions,
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { auth } from '../../services/firebase';
 import {
 	changeCurrentUserPassword,
@@ -147,7 +147,7 @@ export default function Profile({
 	}, [deleteEmail, deletePassword, onSignOut]);
 
 	return React.createElement(
-		SafeAreaView,
+		Screen,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
 			KeyboardAvoidingView,
