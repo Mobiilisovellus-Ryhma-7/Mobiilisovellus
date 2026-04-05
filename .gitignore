@@ -45,6 +45,7 @@ yarn-error.*
 #firebase log
 
 firebase-debug.log
+.firebase/logs
 
 # local firebase admin credentials
 secrets/
