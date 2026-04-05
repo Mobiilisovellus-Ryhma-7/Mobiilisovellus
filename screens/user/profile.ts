@@ -1,17 +1,17 @@
-import React from 'react';
+import * as React from 'react';
 import {
 	Image,
 	KeyboardAvoidingView,
 	Modal,
 	Platform,
 	Pressable,
-	SafeAreaView,
 	StyleSheet,
 	View,
 	useWindowDimensions,
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { auth } from '../../services/firebase';
 import {
 	changeCurrentUserPassword,
@@ -23,14 +23,22 @@ type ProfileProps = {
 	onBack?: () => void;
 	onSignOut?: () => void;
 	onGoHome?: () => void;
+	isDarkMode: boolean;
+	onToggleDarkMode: () => void;
 };
 
-export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
+export default function Profile({
+	onBack,
+	onSignOut,
+	onGoHome,
+	isDarkMode,
+	onToggleDarkMode,
+}: ProfileProps) {
 	const { colors } = useTheme();
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const userEmail = auth?.currentUser?.email ?? 'Käyttäjänimi';
-	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
 	const [isSigningOut, setIsSigningOut] = React.useState(false);
 	const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -139,7 +147,7 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 	}, [deleteEmail, deletePassword, onSignOut]);
 
 	return React.createElement(
-		SafeAreaView,
+		Screen,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
 			KeyboardAvoidingView,
@@ -187,10 +195,14 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 						children: 'Vaihda salasanasi',
 					})
 				),
-				React.createElement(Text, {
-					style: [styles.menuItem, { color: colors.onSurface }],
-					children: 'Teemaväri',
-				}),
+				React.createElement(
+					Pressable,
+					{ onPress: onToggleDarkMode },
+					React.createElement(Text, {
+						style: [styles.menuItem, { color: colors.onSurface }],
+						children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
+					})
+				),
 				React.createElement(Text, {
 					style: [styles.menuItem, { color: colors.onSurface }],
 					children: 'Omat varaukset',
@@ -364,7 +376,10 @@ export default function Profile({ onBack, onSignOut, onGoHome }: ProfileProps) {
 	);
 }
 
-const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+const createStyles = (
+	metrics: ReturnType<typeof getResponsiveMetrics>,
+	colors: any
+) =>
 	StyleSheet.create({
 		safeArea: {
 			flex: 1,
@@ -389,14 +404,14 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			width: metrics.scale(34, 32, 42),
 			height: metrics.scale(34, 32, 42),
 			borderRadius: metrics.scale(17, 16, 21),
-			backgroundColor: '#e8e8e8',
+			backgroundColor: colors.surfaceVariant,
 			alignItems: 'center',
 			justifyContent: 'center',
 		},
 		backIcon: {
 			fontSize: metrics.scale(26, 20, 28),
 			lineHeight: metrics.scale(26, 20, 28),
-			color: '#616161',
+			color: colors.onSurface,
 			marginTop: -2,
 		},
 		headerTitle: {
@@ -443,7 +458,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 		modalCard: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
-			backgroundColor: '#ffffff',
+			backgroundColor: colors.surface,
 			borderRadius: metrics.scale(16, 14, 22),
 			paddingHorizontal: metrics.scale(14, 12, 20),
 			paddingVertical: metrics.scale(14, 12, 20),
@@ -452,12 +467,12 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 		modalTitle: {
 			fontSize: metrics.scale(20, 17, 24),
 			fontWeight: '700',
-			color: '#0f172a',
+			color: colors.onSurface,
 		},
 		modalDescription: {
 			fontSize: metrics.scale(14, 12, 18),
 			lineHeight: metrics.scale(20, 18, 24),
-			color: '#475569',
+			color: colors.onSurfaceVariant,
 		},
 		modalActions: {
 			marginTop: metrics.scale(4, 2, 8),
@@ -472,7 +487,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			alignSelf: 'stretch',
 		},
 		passwordInput: {
-			backgroundColor: '#ffffff',
+			backgroundColor: colors.surface,
 		},
 		changePasswordButton: {
 			borderRadius: metrics.scale(10, 8, 14),

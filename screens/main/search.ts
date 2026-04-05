@@ -8,7 +8,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   View,
@@ -20,12 +19,12 @@ import {
   Dialog,
   Portal,
   Surface,
-  Switch,
   Text,
   TextInput,
   useTheme,
 } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import {
   FacilitySection,
   listFacilitySections,
@@ -37,9 +36,17 @@ import {
 type SearchProps = {
   onBack?: () => void;
   onGoHome?: () => void;
+  initialSearchMode?: SearchMode;
+  initialSport?: string;
+  initialBooked?: boolean;
 };
 
 type SearchMode = 'all' | 'sport' | 'name' | 'status';
+
+type SportOption = {
+  label: string;
+  value: string;
+};
 
 
 
@@ -67,26 +74,36 @@ function matchesDateFilter(section: FacilitySection, dateFilter: string | null):
   return formatDateAsDbDate(parsedDate) === dateFilter;
 }
 
-export default function Search({ onBack, onGoHome }: SearchProps) {
-  const { colors } = useTheme();
+export default function Search({
+  onBack,
+  onGoHome,
+  initialSearchMode,
+  initialSport,
+  initialBooked,
+}: SearchProps) {
+  const { colors, dark } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
-  const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+  const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
 
   const [selectedSection, setSelectedSection] = React.useState<FacilitySection | null>(null);
   const [sections, setSections] = React.useState<FacilitySection[]>([]);
-  const [searchMode, setSearchMode] = React.useState<SearchMode>('all');
-  const [sportInput, setSportInput] = React.useState('');
+  const [searchMode, setSearchMode] = React.useState<SearchMode>(initialSearchMode ?? 'all');
+  const [sportInput, setSportInput] = React.useState(initialSport ?? '');
   const [nameInput, setNameInput] = React.useState('');
+  const [sportOptions, setSportOptions] = React.useState<SportOption[]>([]);
+  const [isSportPickerOpen, setIsSportPickerOpen] = React.useState(false);
   const [bookedOnly, setBookedOnly] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isDatePickerVisible, setIsDatePickerVisible] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(new Date());
   const [activeDateFilter, setActiveDateFilter] = React.useState<string | null>(null);
+  const hasBootstrappedList = React.useRef(false);
+  const hasAppliedInitialFilters = React.useRef(false);
 
   const runSearch = React.useCallback(
-    async (modeOverride?: SearchMode) => {
+    async (modeOverride?: SearchMode, sportOverride?: string, bookedOverride?: boolean) => {
       const mode = modeOverride ?? searchMode;
       setErrorMessage(null);
       setIsLoading(true);
@@ -95,11 +112,13 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
         let nextSections: FacilitySection[] = [];
 
         if (mode === 'sport') {
-          const value = sportInput.trim();
+          const value = (sportOverride ?? sportInput).trim();
           if (!value) {
             throw new Error('Syota laji ennen hakua.');
           }
-          nextSections = await searchFacilitySectionsBySport(value);
+          nextSections = (await searchFacilitySectionsBySport(value)).filter(
+            (section) => section.isBooked !== true
+          );
         } else if (mode === 'name') {
           const value = nameInput.trim();
           if (!value) {
@@ -107,7 +126,16 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
           }
           nextSections = await searchFacilitySectionsByName(value);
         } else if (mode === 'status') {
-          nextSections = await searchFacilitySectionsByBookingStatus(bookedOnly);
+          const bookedValue = bookedOverride ?? bookedOnly;
+          const activeSport = sportInput.trim();
+
+          if (activeSport) {
+            nextSections = (await searchFacilitySectionsBySport(activeSport)).filter(
+              (section) => section.isBooked === bookedValue
+            );
+          } else {
+            nextSections = await searchFacilitySectionsByBookingStatus(bookedValue);
+          }
         } else {
           nextSections = await listFacilitySections();
         }
@@ -125,13 +153,105 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
   );
 
   React.useEffect(() => {
+    let isActive = true;
+
+    listFacilitySections()
+      .then((allSections) => {
+        if (!isActive) {
+          return;
+        }
+
+        const uniqueSports = Array.from(
+          new Set(
+            allSections
+              .map((section) => section.sport?.trim())
+              .filter((value): value is string => !!value)
+          )
+        ).sort((left, right) => left.localeCompare(right, 'fi'));
+
+        setSportOptions(uniqueSports.map((value) => ({ label: value, value })));
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+
+        setSportOptions([]);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (hasBootstrappedList.current) {
+      return;
+    }
+
+    hasBootstrappedList.current = true;
+
+    if (initialSearchMode === 'sport' && initialSport) {
+      return;
+    }
+
+    if (initialSearchMode === 'status' && typeof initialBooked === 'boolean') {
+      return;
+    }
+
     runSearch('all');
-  }, [runSearch]);
+  }, [initialBooked, initialSearchMode, initialSport, runSearch]);
+
+  React.useEffect(() => {
+    if (hasAppliedInitialFilters.current) {
+      return;
+    }
+
+    hasAppliedInitialFilters.current = true;
+
+    if (initialSearchMode === 'sport' && initialSport) {
+      setSearchMode('sport');
+      setSportInput(initialSport);
+      runSearch('sport', initialSport);
+    }
+
+    if (initialSearchMode === 'status' && typeof initialBooked === 'boolean') {
+      setSearchMode('status');
+      setBookedOnly(initialBooked);
+      runSearch('status', undefined, initialBooked);
+    }
+  }, [initialBooked, initialSearchMode, initialSport, runSearch]);
 
   const openMode = (mode: SearchMode) => {
     setSearchMode(mode);
     setErrorMessage(null);
   };
+
+  const openSportPicker = React.useCallback(() => {
+    setSearchMode('sport');
+    setErrorMessage(null);
+    setIsSportPickerOpen(true);
+  }, []);
+
+  const selectSport = React.useCallback(
+    async (value: string) => {
+      setSportInput(value);
+      setSearchMode('sport');
+      setErrorMessage(null);
+      setActiveDateFilter(null);
+      setIsSportPickerOpen(false);
+      await runSearch('sport', value);
+    },
+    [runSearch]
+  );
+
+  const toggleBookingStatus = React.useCallback(async () => {
+    const nextBookedValue = !bookedOnly;
+    setBookedOnly(nextBookedValue);
+    setSearchMode('status');
+    setActiveDateFilter(null);
+    await runSearch('status', undefined, nextBookedValue);
+  }, [bookedOnly, runSearch]);
 
   const applyDateFilter = React.useCallback((date: Date) => {
     setActiveDateFilter(formatDateAsDbDate(date));
@@ -181,7 +301,7 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
         ];
 
   return React.createElement(
-    SafeAreaView,
+    Screen,
     { style: [styles.safeArea, { backgroundColor: colors.background }] },
     React.createElement(
       View,
@@ -219,50 +339,35 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
           React.createElement(Chip, {
             mode: 'flat',
             compact: true,
-            style: styles.filterChip,
-            textStyle: styles.filterChipText,
-            selected: searchMode === 'all',
-            onPress: () => openMode('all'),
-            children: 'Kaikki',
-          }),
-          React.createElement(Chip, {
-            mode: 'flat',
-            compact: true,
+            showSelectedCheck: false,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
             selected: searchMode === 'sport',
-            onPress: () => openMode('sport'),
+            onPress: openSportPicker,
             children: 'Laji',
           }),
           React.createElement(Chip, {
             mode: 'flat',
             compact: true,
+            showSelectedCheck: false,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
-            selected: searchMode === 'name',
-            onPress: () => openMode('name'),
-            children: 'Nimi',
+            onPress: () => setIsDatePickerVisible(true),
+            children: activeDateFilter
+              ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
+              : 'Pvm',
           }),
           React.createElement(Chip, {
             mode: 'flat',
             compact: true,
+            showSelectedCheck: false,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
             selected: searchMode === 'status',
-            onPress: () => openMode('status'),
-            children: 'Varaustila',
+            onPress: toggleBookingStatus,
+            children: bookedOnly ? 'Vapaat' : 'Varatut',
           })
         ),
-        searchMode === 'sport'
-          ? React.createElement(TextInput, {
-              mode: 'outlined',
-              dense: true,
-              label: 'Laji',
-              value: sportInput,
-              onChangeText: setSportInput,
-              style: styles.textInput,
-            })
-          : null,
         searchMode === 'name'
           ? React.createElement(TextInput, {
               mode: 'outlined',
@@ -273,20 +378,6 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
               style: styles.textInput,
             })
           : null,
-        searchMode === 'status'
-          ? React.createElement(
-              View,
-              { style: styles.statusRow },
-              React.createElement(Text, {
-                style: styles.statusText,
-                children: bookedOnly ? 'Nayta varatut' : 'Nayta vapaat',
-              }),
-              React.createElement(Switch, {
-                value: bookedOnly,
-                onValueChange: setBookedOnly,
-              })
-            )
-          : null,
         React.createElement(Button, {
           mode: 'contained',
           onPress: () => runSearch(),
@@ -295,12 +386,6 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
           labelStyle: styles.searchButtonLabel,
           disabled: isLoading,
           children: 'Hae kentat',
-        }),
-        React.createElement(Button, {
-          mode: 'outlined',
-          onPress: () => setIsDatePickerVisible(true),
-          style: styles.dateButton,
-          children: activeDateFilter ? `Paiva: ${activeDateFilter}` : 'Valitse paiva',
         })
       ),
       React.createElement(
@@ -336,6 +421,72 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
       React.createElement(
         Modal,
         {
+          visible: isSportPickerOpen,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setIsSportPickerOpen(false),
+        },
+        React.createElement(
+          View,
+          { style: styles.modalBackdrop },
+          React.createElement(Pressable, {
+            style: styles.modalDismissLayer,
+            onPress: () => setIsSportPickerOpen(false),
+          }),
+          React.createElement(
+            View,
+            { style: styles.modalPickerCard },
+            React.createElement(Text, {
+              style: styles.modalPickerTitle,
+              children: 'Valitse laji',
+            }),
+            React.createElement(
+              ScrollView,
+              {
+                style: styles.sportPickerList,
+                contentContainerStyle: styles.sportPickerListContent,
+              },
+              sportOptions.length > 0
+                ? sportOptions.map((option) =>
+                    React.createElement(
+                      Pressable,
+                      {
+                        key: option.value,
+                        style: [
+                          styles.sportOption,
+                          sportInput === option.value ? styles.sportOptionActive : null,
+                        ],
+                        onPress: () => selectSport(option.value),
+                      },
+                      React.createElement(Text, {
+                        style: [
+                          styles.sportOptionText,
+                          sportInput === option.value ? styles.sportOptionTextActive : null,
+                        ],
+                        children: option.label,
+                      })
+                    )
+                  )
+                : React.createElement(Text, {
+                    style: styles.emptySportText,
+                    children: 'Lajeja ei löytynyt vielä tietokannasta.',
+                  })
+            ),
+            React.createElement(
+              View,
+              { style: styles.modalPickerActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsSportPickerOpen(false),
+                children: 'Sulje',
+              })
+            )
+          )
+        )
+      ),
+      React.createElement(
+        Modal,
+        {
           visible: isDatePickerVisible,
           transparent: true,
           animationType: 'fade',
@@ -362,7 +513,7 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
               mode: 'date',
               locale: 'fi-FI',
               display: Platform.OS === 'ios' ? 'inline' : 'calendar',
-              themeVariant: 'light',
+              themeVariant: dark ? 'dark' : 'light',
               onChange: (event: DateTimePickerEvent, date?: Date) => {
                 if (!date || event.type === 'dismissed') {
                   if (Platform.OS !== 'ios') {
@@ -447,7 +598,10 @@ export default function Search({ onBack, onGoHome }: SearchProps) {
   );
 }
 
-const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+const createStyles = (
+  metrics: ReturnType<typeof getResponsiveMetrics>,
+  colors: any
+) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -465,7 +619,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       marginBottom: metrics.scale(12, 10, 18),
       width: '100%',
       maxWidth: metrics.contentMaxWidth,
-      backgroundColor: '#f7f9fc',
+      backgroundColor: colors.surface,
       borderRadius: metrics.scale(22, 16, 28),
       paddingHorizontal: metrics.scale(14, 10, 20),
       paddingTop: metrics.scale(10, 8, 14),
@@ -480,14 +634,14 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       width: metrics.scale(34, 32, 42),
       height: metrics.scale(34, 32, 42),
       borderRadius: metrics.scale(17, 16, 21),
-      backgroundColor: '#e8e8e8',
+      backgroundColor: colors.surfaceVariant,
       alignItems: 'center',
       justifyContent: 'center',
     },
     backIcon: {
       fontSize: metrics.scale(22, 18, 28),
       lineHeight: metrics.scale(22, 18, 28),
-      color: '#616161',
+      color: colors.onSurface,
       marginTop: -1,
     },
     headerSpacer: {
@@ -509,24 +663,46 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
     filtersRow: {
       marginTop: metrics.scale(18, 12, 24),
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'flex-start',
+      flexWrap: 'nowrap',
+      justifyContent: 'center',
       alignItems: 'center',
+      alignSelf: 'center',
       gap: metrics.scale(8, 6, 12),
     },
     filterChip: {
       minWidth: metrics.scale(86, 72, 120),
       justifyContent: 'center',
-      backgroundColor: '#e6e6e6',
+      backgroundColor: colors.surfaceVariant,
     },
     filterChipText: {
       fontSize: metrics.scale(14, 12, 18),
       fontWeight: '600',
-      color: '#616161',
+      color: colors.onSurface,
     },
     textInput: {
       marginTop: metrics.scale(10, 8, 14),
+      backgroundColor: colors.surface,
+    },
+    sportPickerButton: {
+      marginTop: metrics.scale(10, 8, 14),
+      minHeight: metrics.scale(56, 48, 64),
+      borderRadius: metrics.scale(14, 12, 18),
       backgroundColor: '#ffffff',
+      borderWidth: 1,
+      borderColor: '#cfd8e3',
+      justifyContent: 'center',
+      paddingHorizontal: metrics.scale(14, 12, 18),
+      gap: 4,
+    },
+    sportPickerLabel: {
+      color: '#0f172a',
+      fontSize: metrics.scale(16, 14, 20),
+      fontWeight: '700',
+    },
+    sportPickerHint: {
+      color: '#64748b',
+      fontSize: metrics.scale(12, 11, 14),
+      fontWeight: '500',
     },
     statusRow: {
       marginTop: metrics.scale(10, 8, 14),
@@ -551,15 +727,15 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       fontWeight: '700',
     },
     dateButton: {
-      marginTop: metrics.scale(10, 8, 14),
-      alignSelf: 'flex-start',
+      marginTop: 0,
+      alignSelf: 'auto',
       borderRadius: metrics.scale(10, 8, 14),
     },
     listSurface: {
       flex: 1,
       width: '100%',
       maxWidth: metrics.contentMaxWidth,
-      backgroundColor: '#f7f9fc',
+      backgroundColor: colors.surface,
       borderRadius: metrics.scale(22, 16, 28),
       paddingHorizontal: metrics.scale(12, 8, 18),
     },
@@ -576,7 +752,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       marginTop: metrics.scale(8, 6, 10),
     },
     emptyText: {
-      color: '#475569',
+      color: colors.onSurfaceVariant,
       fontSize: metrics.scale(14, 12, 17),
       marginTop: metrics.scale(12, 8, 18),
       textAlign: 'center',
@@ -584,7 +760,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
     slotRow: {
       minHeight: metrics.scale(66, 52, 78),
       borderBottomWidth: 1,
-      borderBottomColor: '#d5d5d5',
+      borderBottomColor: colors.outline,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -605,7 +781,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
     },
     chevron: {
       fontSize: metrics.scale(20, 16, 26),
-      color: '#c8c8c8',
+      color: colors.outline,
       marginLeft: 8,
     },
     modalBackdrop: {
@@ -615,22 +791,58 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       alignItems: 'center',
       paddingHorizontal: metrics.horizontalPadding,
     },
+    modalDismissLayer: {
+      ...StyleSheet.absoluteFillObject,
+    },
     modalPickerCard: {
       width: '100%',
       maxWidth: metrics.isTablet ? 460 : 360,
-      backgroundColor: '#f7f9fc',
+      backgroundColor: colors.surface,
       borderRadius: metrics.scale(24, 18, 30),
       padding: metrics.scale(16, 12, 20),
       gap: metrics.scale(12, 10, 16),
     },
     modalPickerTitle: {
-      color: '#0f172a',
+      color: colors.onSurface,
       fontSize: metrics.scale(18, 16, 22),
       fontWeight: '700',
     },
     modalPickerActions: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
+    },
+    sportPickerList: {
+      maxHeight: metrics.scale(340, 280, 420),
+    },
+    sportPickerListContent: {
+      gap: metrics.scale(8, 6, 10),
+      paddingBottom: metrics.scale(4, 2, 8),
+    },
+    sportOption: {
+      paddingHorizontal: metrics.scale(14, 12, 18),
+      paddingVertical: metrics.scale(12, 10, 16),
+      borderRadius: metrics.scale(14, 12, 18),
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.outline,
+    },
+    sportOptionActive: {
+      backgroundColor: '#dbeafe',
+      borderColor: '#60a5fa',
+    },
+    sportOptionText: {
+      color: colors.onSurface,
+      fontSize: metrics.scale(15, 13, 18),
+      fontWeight: '600',
+    },
+    sportOptionTextActive: {
+      color: '#1d4ed8',
+      fontWeight: '700',
+    },
+    emptySportText: {
+      color: colors.onSurfaceVariant,
+      fontSize: metrics.scale(14, 12, 16),
+      fontWeight: '500',
     },
     dialog: {
       backgroundColor: 'transparent',
@@ -643,7 +855,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
     },
     modalCard: {
       width: '100%',
-      backgroundColor: '#9a9a9a',
+      backgroundColor: colors.surface,
       borderRadius: metrics.scale(18, 14, 24),
       paddingHorizontal: metrics.scale(18, 14, 26),
       paddingVertical: metrics.scale(14, 12, 22),
@@ -655,18 +867,18 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       gap: 8,
     },
     modalHall: {
-      color: '#ffffff',
+      color: colors.onSurface,
       fontSize: metrics.scale(14, 12, 18),
       fontWeight: '700',
       maxWidth: '65%',
     },
     modalTime: {
-      color: '#ffffff',
+      color: colors.onSurface,
       fontSize: metrics.scale(14, 12, 18),
       fontWeight: '700',
     },
     modalSubLine: {
-      color: '#ffffff',
+      color: colors.onSurface,
       fontSize: metrics.scale(13, 11, 16),
       fontWeight: '700',
       marginTop: 2,
@@ -676,14 +888,14 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       marginBottom: metrics.scale(12, 10, 18),
       height: metrics.scale(76, 60, 110),
       borderRadius: 2,
-      backgroundColor: '#d9d9d9',
+      backgroundColor: colors.surfaceVariant,
       justifyContent: 'center',
       alignItems: 'flex-start',
       paddingLeft: metrics.scale(24, 18, 30),
     },
     mapPin: {
       fontSize: metrics.scale(18, 14, 22),
-      color: '#475569',
+      color: colors.onSurfaceVariant,
       fontWeight: '700',
     },
     reserveButton: {

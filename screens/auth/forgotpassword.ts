@@ -4,7 +4,6 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
-	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	View,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { requestPasswordReset } from '../../services/auth';
 
 type ForgotPasswordProps = {
@@ -23,7 +23,7 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 	const { colors } = useTheme();
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
-	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
 	const [email, setEmail] = React.useState('');
 	const [isSubmitting, setIsSubmitting] = React.useState(false);
 	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -54,7 +54,7 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 	}, [email]);
 
 	return React.createElement(
-		SafeAreaView,
+		Screen,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
 			KeyboardAvoidingView,
@@ -94,7 +94,7 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 						})
 					),
 					React.createElement(Text, {
-						style: styles.brand,
+						style: [styles.brand, { color: colors.onSurfaceVariant }],
 						children: 'Hallille',
 					}),
 					React.createElement(Text, {
@@ -102,11 +102,11 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 						children: 'Unohtuiko salasana?',
 					}),
 					React.createElement(Text, {
-						style: styles.subtitle,
+						style: [styles.subtitle, { color: colors.onSurfaceVariant }],
 						children: 'Lähetämme palautuslinkin sähköpostiisi.',
 					}),
 					React.createElement(Text, {
-						style: styles.label,
+						style: [styles.label, { color: colors.primary }],
 						children: 'Sähköposti',
 					}),
 					React.createElement(TextInput, {
@@ -149,7 +149,10 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 	);
 }
 
-const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+const createStyles = (
+	metrics: ReturnType<typeof getResponsiveMetrics>,
+	colors: any
+) =>
 	StyleSheet.create({
 		safeArea: {
 			flex: 1,
@@ -169,7 +172,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 		contentWrap: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
-			backgroundColor: '#f7f9fc',
+			backgroundColor: colors.surface,
 			borderRadius: metrics.scale(22, 18, 28),
 			paddingHorizontal: metrics.scale(18, 14, 26),
 			paddingVertical: metrics.scale(16, 12, 22),
@@ -184,14 +187,14 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			width: metrics.scale(34, 32, 42),
 			height: metrics.scale(34, 32, 42),
 			borderRadius: metrics.scale(17, 16, 21),
-			backgroundColor: '#e8e8e8',
+			backgroundColor: colors.surfaceVariant,
 			alignItems: 'center',
 			justifyContent: 'center',
 		},
 		backIcon: {
 			fontSize: metrics.scale(26, 20, 28),
 			lineHeight: metrics.scale(26, 20, 28),
-			color: '#616161',
+			color: colors.onSurface,
 			marginTop: -2,
 		},
 		headerSpacer: {

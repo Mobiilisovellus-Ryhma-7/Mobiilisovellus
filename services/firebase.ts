@@ -114,6 +114,8 @@ function mapSection(id: string, data: Record<string, unknown>): FacilitySection 
     description: asNullableString(data.description),
     isBooked: typeof data.isBooked === 'boolean'
       ? data.isBooked
+      : typeof data.is_Booked === 'boolean'
+        ? data.is_Booked
       : typeof data.is_booked === 'boolean'
         ? data.is_booked
         : null,
@@ -139,7 +141,25 @@ export async function listFacilitySections() {
 export async function searchFacilitySectionsBySport(sport: string) {
   const normalizedSport = normalize(sport);
   const sections = await fetchAllFacilitySections();
-  return sections.filter((section) => normalize(section.sport ?? '') === normalizedSport);
+  return sections.filter((section) => {
+    const sectionSport = normalize(section.sport ?? '');
+
+    if (!sectionSport || !normalizedSport) {
+      return false;
+    }
+
+    if (sectionSport === normalizedSport) {
+      return true;
+    }
+
+    // Handle values like "Jalkapallo / Futsal" or comma-separated sports.
+    const tokens = sectionSport
+      .split(/[,;/|]/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    return tokens.includes(normalizedSport) || sectionSport.includes(normalizedSport);
+  });
 }
 
 export async function searchFacilitySectionsByName(name: string) {

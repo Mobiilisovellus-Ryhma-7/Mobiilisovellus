@@ -2,13 +2,13 @@ import React from 'react';
 import {
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 
@@ -26,7 +26,7 @@ export default function MainPage({
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
-  const styles = React.useMemo(() => createStyles(metrics), [metrics]);
+  const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
   const [isSignedIn, setIsSignedIn] = React.useState(false);
 
   React.useEffect(() => {
@@ -43,7 +43,7 @@ export default function MainPage({
   }, []);
 // Pääsivu
   return React.createElement(
-    SafeAreaView, 
+    Screen,
     { style: [styles.safeArea, { backgroundColor: colors.background }] },
     React.createElement(
       View,
@@ -104,7 +104,10 @@ export default function MainPage({
   );
 }
 
-const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+const createStyles = (
+  metrics: ReturnType<typeof getResponsiveMetrics>,
+  colors: any
+) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -123,7 +126,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       width: '100%',
       maxWidth: metrics.contentMaxWidth,
       alignItems: 'center',
-      backgroundColor: '#f7f9fc',
+      backgroundColor: colors.surface,
       borderRadius: metrics.scale(24, 18, 30),
       paddingHorizontal: metrics.scale(20, 14, 28),
       paddingVertical: metrics.scale(20, 14, 30),
@@ -138,7 +141,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       fontSize: metrics.scale(30, 24, 36),
       letterSpacing: 0.6,
       fontStyle: 'italic',
-      color: '#0f172a',
+      color: colors.onSurface,
       textAlign: 'center',
     },
     buttonsWrap: {
@@ -161,7 +164,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       fontWeight: '600',
     },
     signedInText: {
-      color: '#64748b',
+      color: colors.onSurfaceVariant,
       fontSize: metrics.scale(15, 13, 18),
       fontWeight: '600',
       marginTop: metrics.scale(4, 2, 6),
@@ -178,7 +181,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       width: metrics.scale(46, 40, 58),
       height: metrics.scale(46, 40, 58),
       borderRadius: metrics.scale(23, 20, 29),
-      backgroundColor: '#e8e8e8',
+      backgroundColor: colors.surfaceVariant,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 0,
@@ -195,7 +198,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       width: metrics.scale(12, 10, 16),
       height: metrics.scale(12, 10, 16),
       borderRadius: metrics.scale(6, 5, 8),
-      backgroundColor: '#414141',
+      backgroundColor: colors.onSurface,
       marginBottom: 2,
     },
     profileBody: {
@@ -203,6 +206,6 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
       height: metrics.scale(10, 8, 14),
       borderTopLeftRadius: metrics.scale(9, 7, 12),
       borderTopRightRadius: metrics.scale(9, 7, 12),
-      backgroundColor: '#414141',
+      backgroundColor: colors.onSurface,
     },
   });

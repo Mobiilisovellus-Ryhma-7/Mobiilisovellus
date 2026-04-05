@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import * as React from 'react';
 import {
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
-	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	View,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { registerUser } from '../../services/auth';
 
 type RegisterProps = {
@@ -25,11 +25,11 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 	const { colors } = useTheme();
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
-	const styles = React.useMemo(() => createStyles(metrics), [metrics]);
-	const [email, setEmail] = useState('');
-	const [password, setPassword] = useState('');
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
+	const [email, setEmail] = React.useState('');
+	const [password, setPassword] = React.useState('');
+	const [isSubmitting, setIsSubmitting] = React.useState(false);
+	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
 	const handleRegister = React.useCallback(async () => {
 		const trimmedEmail = email.trim();
@@ -61,7 +61,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 	}, [email, onRegister, password]);
 
 	return React.createElement(
-		SafeAreaView,
+		Screen,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
 			KeyboardAvoidingView,
@@ -101,7 +101,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 				})
 			),
 			React.createElement(Text, {
-				style: styles.brand,
+				style: [styles.brand, { color: colors.onSurfaceVariant }],
 				children: 'Hallille',
 			}),
 
@@ -111,7 +111,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 			}),
 
 			React.createElement(Text, {
-				style: styles.label,
+				style: [styles.label, { color: colors.primary }],
 				children: 'Sähköposti',
 			}),
 			React.createElement(TextInput, {
@@ -126,7 +126,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 			}),
 
 			React.createElement(Text, {
-				style: [styles.label, styles.passwordLabel],
+				style: [styles.label, styles.passwordLabel, { color: colors.primary }],
 				children: 'Salasana',
 			}),
 			React.createElement(TextInput, {
@@ -163,14 +163,14 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 				View,
 				{ style: styles.loginLinkWrap },
 				React.createElement(Text, {
-					style: styles.loginPrefix,
+					style: [styles.loginPrefix, { color: colors.onSurfaceVariant }],
 					children: 'Löytyykö jo käyttäjä?',
 				}),
 				React.createElement(
 					Pressable,
 					{ onPress: onGoLogin },
 					React.createElement(Text, {
-						style: styles.loginLink,
+						style: [styles.loginLink, { color: colors.primary }],
 						children: 'Kirjaudu sisään',
 					})
 				)
@@ -181,7 +181,10 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 	);
 }
 
-const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
+const createStyles = (
+	metrics: ReturnType<typeof getResponsiveMetrics>,
+	colors: any
+) =>
 	StyleSheet.create({
 		safeArea: {
 			flex: 1,
@@ -201,7 +204,7 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 		contentWrap: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
-			backgroundColor: '#f7f9fc',
+			backgroundColor: colors.surface,
 			borderRadius: metrics.scale(22, 18, 28),
 			paddingHorizontal: metrics.scale(18, 14, 26),
 			paddingVertical: metrics.scale(16, 12, 22),
@@ -216,14 +219,14 @@ const createStyles = (metrics: ReturnType<typeof getResponsiveMetrics>) =>
 			width: metrics.scale(34, 32, 42),
 			height: metrics.scale(34, 32, 42),
 			borderRadius: metrics.scale(17, 16, 21),
-			backgroundColor: '#e8e8e8',
+			backgroundColor: colors.surfaceVariant,
 			alignItems: 'center',
 			justifyContent: 'center',
 		},
 		backIcon: {
 			fontSize: metrics.scale(26, 20, 28),
 			lineHeight: metrics.scale(26, 20, 28),
-			color: '#616161',
+			color: colors.onSurface,
 			marginTop: -2,
 		},
 		headerSpacer: {
