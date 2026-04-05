@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import * as React from 'react';
 import {
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
-	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	View,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { registerUser } from '../../services/auth';
 
 type RegisterProps = {
@@ -26,10 +26,10 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
-	const [email, setEmail] = useState('');
-	const [password, setPassword] = useState('');
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+	const [email, setEmail] = React.useState('');
+	const [password, setPassword] = React.useState('');
+	const [isSubmitting, setIsSubmitting] = React.useState(false);
+	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
 	const handleRegister = React.useCallback(async () => {
 		const trimmedEmail = email.trim();
@@ -61,7 +61,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 	}, [email, onRegister, password]);
 
 	return React.createElement(
-		SafeAreaView,
+		Screen,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
 			KeyboardAvoidingView,

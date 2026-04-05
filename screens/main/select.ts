@@ -5,7 +5,6 @@ import {
   Platform,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   View,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Button, Switch, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import {
   listFacilitySections,
   searchFacilitySectionsByBookingStatus,
@@ -159,7 +159,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
     : 'Valitse päivämäärä';
 
   return React.createElement(
-    SafeAreaView,
+    Screen,
     { style: [styles.safeArea, { backgroundColor: colors.background }] },
     React.createElement(
       View,

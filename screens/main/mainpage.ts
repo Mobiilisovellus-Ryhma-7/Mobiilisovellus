@@ -2,13 +2,13 @@ import React from 'react';
 import {
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 
@@ -43,7 +43,7 @@ export default function MainPage({
   }, []);
 // Pääsivu
   return React.createElement(
-    SafeAreaView, 
+    Screen,
     { style: [styles.safeArea, { backgroundColor: colors.background }] },
     React.createElement(
       View,

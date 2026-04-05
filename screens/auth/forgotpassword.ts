@@ -4,7 +4,6 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
-	SafeAreaView,
 	ScrollView,
 	StyleSheet,
 	View,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import Screen from '../shared/Screen';
 import { requestPasswordReset } from '../../services/auth';
 
 type ForgotPasswordProps = {
@@ -54,7 +54,7 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 	}, [email]);
 
 	return React.createElement(
-		SafeAreaView,
+		Screen,
 		{ style: [styles.safeArea, { backgroundColor: colors.background }] },
 		React.createElement(
 			KeyboardAvoidingView,
