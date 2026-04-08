@@ -44,11 +44,3 @@ npm run db:seed:firestore:no-reset -- --service-account ./secrets/firebase-admin
 Custom SQL file:
 
 npm run db:seed:firestore -- --sql ./setup2.txt --service-account ./secrets/firebase-admin.json
-
-Reseed only facility_sections (clear + insert only that collection):
-
-npm run db:seed:firestore:facility-sections -- --service-account ./secrets/firebase-admin.json
-
-You can also choose any comma-separated collection list:
-
-npm run db:seed:firestore -- --collections facility_sections,facilities --service-account ./secrets/firebase-admin.json
