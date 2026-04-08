@@ -37,6 +37,7 @@ import {
   searchFacilitySectionsByBookingStatus,
   searchFacilitySectionsBySport,
 } from '../../services/firebase';
+import { scheduleBookingReminder } from '../../services/notifications';
 import { collection, getDocs } from 'firebase/firestore';
 import { buildDailyTimeSlots, formatDateKey, TimeSlot } from '../../utils/timeslots';
 
@@ -557,6 +558,14 @@ export default function Search({
           slotStart: slot.start,
           slotEnd: slot.end,
           status: 'confirmed',
+        });
+
+        const facilityName = getFacilityName(selectedSection);
+        await scheduleBookingReminder({
+          facilityName,
+          bookingDate,
+          slotStart: slot.start,
+          minutesBefore: 15,
         });
 
         setBookingFeedback(`Vuoro ${slot.label} varattu.`);
@@ -1151,7 +1160,7 @@ export default function Search({
                   }),
                   React.createElement(Text, {
                     style: styles.modalTime,
-                    children: selectedSection?.isBooked ? 'Varattu' : 'Vapaa',
+                    children: selectedSection?.isBooked ? 'Varattu' : null,
                   })
                 ),
                 React.createElement(Text, {
