@@ -17,6 +17,7 @@ export type RootStackParamList = {
     | {
         mode?: 'all' | 'sport' | 'name' | 'status';
         sport?: string;
+        name?: string;
         booked?: boolean;
       }
     | undefined;
@@ -74,10 +75,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
           <Select
             onBack={() => navigation.goBack()}
             onSearch={(params) =>
-              navigation.navigate(
-                'search',
-                params?.mode === 'sport' || params?.mode === 'status' ? params : undefined
-              )
+              navigation.navigate('search', params)
             }
           />
         )}
@@ -90,6 +88,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
             onGoHome={() => navigation.navigate('main')}
             initialSearchMode={route.params?.mode}
             initialSport={route.params?.sport}
+            initialName={route.params?.name}
             initialBooked={route.params?.booked}
           />
         )}

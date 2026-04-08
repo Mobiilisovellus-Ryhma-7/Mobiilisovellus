@@ -5,6 +5,8 @@ import DateTimePicker, {
 import {
   ActivityIndicator,
   Image,
+  Linking,
+  LayoutChangeEvent,
   Modal,
   Platform,
   Pressable,
@@ -20,24 +22,25 @@ import {
   Portal,
   Surface,
   Text,
-  TextInput,
   useTheme,
 } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import Screen from '../shared/Screen';
 import {
   FacilitySection,
+  db,
   listFacilitySections,
   searchFacilitySectionsByBookingStatus,
-  searchFacilitySectionsByName,
   searchFacilitySectionsBySport,
 } from '../../services/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 type SearchProps = {
   onBack?: () => void;
   onGoHome?: () => void;
   initialSearchMode?: SearchMode;
   initialSport?: string;
+  initialName?: string;
   initialBooked?: boolean;
 };
 
@@ -46,6 +49,19 @@ type SearchMode = 'all' | 'sport' | 'name' | 'status';
 type SportOption = {
   label: string;
   value: string;
+};
+
+type MapTile = {
+  key: string;
+  uri: string;
+  left: number;
+  top: number;
+};
+
+type MapPreview = {
+  tiles: MapTile[];
+  pointX: number;
+  pointY: number;
 };
 
 
@@ -74,11 +90,54 @@ function matchesDateFilter(section: FacilitySection, dateFilter: string | null):
   return formatDateAsDbDate(parsedDate) === dateFilter;
 }
 
+function normalizeFacilityKey(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value
+    .trim()
+    .replace(/^id\s*:\s*/i, '')
+    .replace(/^['"]|['"]$/g, '')
+    .toLowerCase();
+}
+
+function stripSportPrefixFromSectionName(sectionName: string, sportName: string): string {
+  const trimmedSectionName = sectionName.trim();
+  const trimmedSportName = sportName.trim();
+
+  if (!trimmedSectionName || !trimmedSportName) {
+    return trimmedSectionName;
+  }
+
+  const normalizedSectionName = trimmedSectionName.toLowerCase();
+  const normalizedSportName = trimmedSportName.toLowerCase();
+
+  if (normalizedSectionName.startsWith(normalizedSportName)) {
+    const remainder = trimmedSectionName.slice(trimmedSportName.length).trim();
+    const cleanedRemainder = remainder.replace(/^[-,:]\s*/, '').trim();
+    return cleanedRemainder || trimmedSectionName;
+  }
+
+  return trimmedSectionName;
+}
+
+function latLonToTile(lat: number, lon: number, zoom: number) {
+  const latitudeRad = (lat * Math.PI) / 180;
+  const n = 2 ** zoom;
+  const x = ((lon + 180) / 360) * n;
+  const y =
+    ((1 - Math.log(Math.tan(latitudeRad) + 1 / Math.cos(latitudeRad)) / Math.PI) / 2) * n;
+
+  return { x, y };
+}
+
 export default function Search({
   onBack,
   onGoHome,
   initialSearchMode,
   initialSport,
+  initialName,
   initialBooked,
 }: SearchProps) {
   const { colors, dark } = useTheme();
@@ -88,11 +147,16 @@ export default function Search({
 
   const [selectedSection, setSelectedSection] = React.useState<FacilitySection | null>(null);
   const [sections, setSections] = React.useState<FacilitySection[]>([]);
+  const [facilityNameById, setFacilityNameById] = React.useState<Record<string, string>>({});
+  const [facilityAddressById, setFacilityAddressById] = React.useState<Record<string, string>>({});
+  const [mapPreview, setMapPreview] = React.useState<MapPreview | null>(null);
+  const [mapViewport, setMapViewport] = React.useState({ width: 0, height: 0 });
   const [searchMode, setSearchMode] = React.useState<SearchMode>(initialSearchMode ?? 'all');
   const [sportInput, setSportInput] = React.useState(initialSport ?? '');
-  const [nameInput, setNameInput] = React.useState('');
+  const [nameInput, setNameInput] = React.useState(initialName ?? '');
   const [sportOptions, setSportOptions] = React.useState<SportOption[]>([]);
   const [isSportPickerOpen, setIsSportPickerOpen] = React.useState(false);
+  const [isPlacePickerOpen, setIsPlacePickerOpen] = React.useState(false);
   const [bookedOnly, setBookedOnly] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -103,7 +167,12 @@ export default function Search({
   const hasAppliedInitialFilters = React.useRef(false);
 
   const runSearch = React.useCallback(
-    async (modeOverride?: SearchMode, sportOverride?: string, bookedOverride?: boolean) => {
+    async (
+      modeOverride?: SearchMode,
+      sportOverride?: string,
+      bookedOverride?: boolean,
+      nameOverride?: string
+    ) => {
       const mode = modeOverride ?? searchMode;
       setErrorMessage(null);
       setIsLoading(true);
@@ -120,11 +189,38 @@ export default function Search({
             (section) => section.isBooked !== true
           );
         } else if (mode === 'name') {
-          const value = nameInput.trim();
+          const value = (nameOverride ?? nameInput).trim();
           if (!value) {
             throw new Error('Syota kentan nimi ennen hakua.');
           }
-          nextSections = await searchFacilitySectionsByName(value);
+
+          if (!db) {
+            throw new Error('Tietokantayhteys puuttuu.');
+          }
+
+          const [facilitiesSnapshot, allSections] = await Promise.all([
+            getDocs(collection(db, 'facilities')),
+            listFacilitySections(),
+          ]);
+
+          const normalizedNameValue = value.trim().toLowerCase();
+          const matchingFacilityIds = new Set(
+            facilitiesSnapshot.docs
+              .filter((doc) => {
+                const data = doc.data() as { name?: unknown };
+                const facilityName = typeof data.name === 'string' ? data.name.trim().toLowerCase() : '';
+                return facilityName.includes(normalizedNameValue);
+              })
+              .flatMap((doc) => {
+                const data = doc.data() as { id?: unknown };
+                const keys = [normalizeFacilityKey(doc.id), normalizeFacilityKey(data.id)];
+                return keys.filter((key) => !!key);
+              })
+          );
+
+          nextSections = allSections.filter(
+            (section) => matchingFacilityIds.has(normalizeFacilityKey(section.facilityId))
+          );
         } else if (mode === 'status') {
           const bookedValue = bookedOverride ?? bookedOnly;
           const activeSport = sportInput.trim();
@@ -185,6 +281,70 @@ export default function Search({
   }, []);
 
   React.useEffect(() => {
+    let isActive = true;
+
+    if (!db) {
+      setFacilityNameById({});
+      setFacilityAddressById({});
+      return () => {
+        isActive = false;
+      };
+    }
+
+    getDocs(collection(db, 'facilities'))
+      .then((snapshot) => {
+        if (!isActive) {
+          return;
+        }
+
+        const nextFacilityNameById = snapshot.docs.reduce<Record<string, string>>((acc, doc) => {
+          const data = doc.data() as { id?: unknown; name?: unknown };
+          if (typeof data.name === 'string' && data.name.trim()) {
+            const normalizedDocId = normalizeFacilityKey(doc.id);
+            const normalizedDataId = normalizeFacilityKey(data.id);
+            if (normalizedDocId) {
+              acc[normalizedDocId] = data.name.trim();
+            }
+            if (normalizedDataId) {
+              acc[normalizedDataId] = data.name.trim();
+            }
+          }
+          return acc;
+        }, {});
+
+        const nextFacilityAddressById = snapshot.docs.reduce<Record<string, string>>((acc, doc) => {
+          const data = doc.data() as { id?: unknown; address?: unknown };
+          if (typeof data.address === 'string' && data.address.trim()) {
+            const normalizedDocId = normalizeFacilityKey(doc.id);
+            const normalizedDataId = normalizeFacilityKey(data.id);
+            if (normalizedDocId) {
+              acc[normalizedDocId] = data.address.trim();
+            }
+            if (normalizedDataId) {
+              acc[normalizedDataId] = data.address.trim();
+            }
+          }
+          return acc;
+        }, {});
+
+        setFacilityNameById(nextFacilityNameById);
+        setFacilityAddressById(nextFacilityAddressById);
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+
+        setFacilityNameById({});
+        setFacilityAddressById({});
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
     if (hasBootstrappedList.current) {
       return;
     }
@@ -195,12 +355,16 @@ export default function Search({
       return;
     }
 
+    if (initialSearchMode === 'name' && initialName) {
+      return;
+    }
+
     if (initialSearchMode === 'status' && typeof initialBooked === 'boolean') {
       return;
     }
 
     runSearch('all');
-  }, [initialBooked, initialSearchMode, initialSport, runSearch]);
+  }, [initialBooked, initialName, initialSearchMode, initialSport, runSearch]);
 
   React.useEffect(() => {
     if (hasAppliedInitialFilters.current) {
@@ -215,12 +379,18 @@ export default function Search({
       runSearch('sport', initialSport);
     }
 
+    if (initialSearchMode === 'name' && initialName) {
+      setSearchMode('name');
+      setNameInput(initialName);
+      runSearch('name');
+    }
+
     if (initialSearchMode === 'status' && typeof initialBooked === 'boolean') {
       setSearchMode('status');
       setBookedOnly(initialBooked);
       runSearch('status', undefined, initialBooked);
     }
-  }, [initialBooked, initialSearchMode, initialSport, runSearch]);
+  }, [initialBooked, initialName, initialSearchMode, initialSport, runSearch]);
 
   const openMode = (mode: SearchMode) => {
     setSearchMode(mode);
@@ -233,6 +403,12 @@ export default function Search({
     setIsSportPickerOpen(true);
   }, []);
 
+  const openPlacePicker = React.useCallback(() => {
+    setSearchMode('name');
+    setErrorMessage(null);
+    setIsPlacePickerOpen(true);
+  }, []);
+
   const selectSport = React.useCallback(
     async (value: string) => {
       setSportInput(value);
@@ -241,6 +417,17 @@ export default function Search({
       setActiveDateFilter(null);
       setIsSportPickerOpen(false);
       await runSearch('sport', value);
+    },
+    [runSearch]
+  );
+
+  const selectPlace = React.useCallback(
+    async (value: string) => {
+      setNameInput(value);
+      setSearchMode('name');
+      setErrorMessage(null);
+      setIsPlacePickerOpen(false);
+      await runSearch('name', undefined, undefined, value);
     },
     [runSearch]
   );
@@ -262,6 +449,179 @@ export default function Search({
     [activeDateFilter, sections]
   );
 
+  const placeOptions = React.useMemo(
+    () =>
+      Array.from(new Set(Object.values(facilityNameById)))
+        .filter((value) => !!value)
+        .sort((left, right) => left.localeCompare(right, 'fi')),
+    [facilityNameById]
+  );
+
+  const formatSectionLabel = React.useCallback(
+    (section: FacilitySection) => {
+      const facilityName =
+        facilityNameById[normalizeFacilityKey(section.facilityId)] ?? 'Tuntematon halli';
+      const sportName = section.sport?.trim() || 'Tuntematon laji';
+      const rawSectionName = section.name?.trim() || 'Nimeton kentta';
+      const sectionName = stripSportPrefixFromSectionName(rawSectionName, sportName);
+      return `${facilityName}, ${sportName}, ${sectionName}`;
+    },
+    [facilityNameById]
+  );
+
+  const getFacilityName = React.useCallback(
+    (section: FacilitySection) =>
+      facilityNameById[normalizeFacilityKey(section.facilityId)] ?? 'Tuntematon halli',
+    [facilityNameById]
+  );
+
+  const getSportAndFieldLabel = React.useCallback((section: FacilitySection) => {
+    const sportName = section.sport?.trim() || 'Tuntematon laji';
+    const rawSectionName = section.name?.trim() || 'Nimeton kentta';
+    const sectionName = stripSportPrefixFromSectionName(rawSectionName, sportName);
+    return `${sportName}, ${sectionName}`;
+  }, []);
+
+  const getFacilityAddress = React.useCallback(
+    (section: FacilitySection) =>
+      facilityAddressById[normalizeFacilityKey(section.facilityId)] ?? null,
+    [facilityAddressById]
+  );
+
+  const openInMaps = React.useCallback(async () => {
+    if (!selectedSection) {
+      return;
+    }
+
+    const address = getFacilityAddress(selectedSection);
+    const fallbackQuery = encodeURIComponent(
+      address ?? `${getFacilityName(selectedSection)}, Oulu, Finland`
+    );
+
+    const primaryUrl =
+      Platform.OS === 'ios'
+        ? `maps://?q=${fallbackQuery}`
+        : `geo:0,0?q=${fallbackQuery}`;
+    const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${fallbackQuery}`;
+
+    try {
+      const supported = await Linking.canOpenURL(primaryUrl);
+      if (supported) {
+        await Linking.openURL(primaryUrl);
+        return;
+      }
+
+      await Linking.openURL(fallbackUrl);
+    } catch {
+      await Linking.openURL(fallbackUrl);
+    }
+  }, [getFacilityAddress, getFacilityName, selectedSection]);
+
+  React.useEffect(() => {
+    let isActive = true;
+
+    const loadMapPreview = async () => {
+      if (!selectedSection) {
+        setMapPreview(null);
+        return;
+      }
+
+      const address = getFacilityAddress(selectedSection);
+      if (!address) {
+        setMapPreview(null);
+        return;
+      }
+
+      try {
+        const query = encodeURIComponent(`${address}, Finland`);
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${query}&format=jsonv2&limit=1&countrycodes=fi`,
+          {
+            headers: {
+              Accept: 'application/json',
+              'Accept-Language': 'fi',
+              'User-Agent': 'hallille-app/1.0 (expo)',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          setMapPreview(null);
+          return;
+        }
+
+        const results = (await response.json()) as Array<{ lat: string; lon: string }>;
+
+        if (!isActive || !results[0]) {
+          setMapPreview(null);
+          return;
+        }
+
+        const latitude = Number(results[0].lat);
+        const longitude = Number(results[0].lon);
+        if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+          setMapPreview(null);
+          return;
+        }
+
+        const zoom = 15;
+        const tileCoords = latLonToTile(latitude, longitude, zoom);
+        const centerTileX = Math.floor(tileCoords.x);
+        const centerTileY = Math.floor(tileCoords.y);
+        const fracX = tileCoords.x - centerTileX;
+        const fracY = tileCoords.y - centerTileY;
+        const tileSize = 256;
+
+        const tiles: MapTile[] = [];
+        for (let row = -1; row <= 1; row += 1) {
+          for (let col = -1; col <= 1; col += 1) {
+            const tileX = centerTileX + col;
+            const tileY = centerTileY + row;
+            tiles.push({
+              key: `${zoom}-${tileX}-${tileY}`,
+              uri: `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`,
+              left: (col + 1) * tileSize,
+              top: (row + 1) * tileSize,
+            });
+          }
+        }
+
+        setMapPreview({
+          tiles,
+          pointX: (1 + fracX) * tileSize,
+          pointY: (1 + fracY) * tileSize,
+        });
+      } catch {
+        if (!isActive) {
+          return;
+        }
+        setMapPreview(null);
+      }
+    };
+
+    void loadMapPreview();
+
+    return () => {
+      isActive = false;
+    };
+  }, [getFacilityAddress, selectedSection]);
+
+  const onMapViewportLayout = React.useCallback((event: LayoutChangeEvent) => {
+    const { width: nextWidth, height: nextHeight } = event.nativeEvent.layout;
+    setMapViewport({ width: nextWidth, height: nextHeight });
+  }, []);
+
+  const mapCanvasOffset = React.useMemo(() => {
+    if (!mapPreview) {
+      return { left: 0, top: 0 };
+    }
+
+    return {
+      left: mapViewport.width / 2 - mapPreview.pointX,
+      top: mapViewport.height / 2 - mapPreview.pointY,
+    };
+  }, [mapPreview, mapViewport.height, mapViewport.width]);
+
   const slotRows = filteredSections.map((section) =>
     React.createElement(
       Pressable,
@@ -275,11 +635,11 @@ export default function Search({
         { style: styles.slotTextWrap },
         React.createElement(Text, {
           style: [styles.slotTitle, { color: colors.onSurface }],
-          children: section.name ?? 'Nimeton kentta',
+          children: getFacilityName(section),
         }),
         React.createElement(Text, {
           style: [styles.slotTime, { color: colors.onSurface }],
-          children: section.isBooked ? 'Varattu' : 'Vapaa',
+          children: getSportAndFieldLabel(section),
         })
       ),
       React.createElement(Text, {
@@ -352,6 +712,16 @@ export default function Search({
             showSelectedCheck: false,
             style: styles.filterChip,
             textStyle: styles.filterChipText,
+            selected: searchMode === 'name',
+            onPress: openPlacePicker,
+            children: 'Paikka',
+          }),
+          React.createElement(Chip, {
+            mode: 'flat',
+            compact: true,
+            showSelectedCheck: false,
+            style: styles.filterChip,
+            textStyle: styles.filterChipText,
             onPress: () => setIsDatePickerVisible(true),
             children: activeDateFilter
               ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
@@ -368,25 +738,6 @@ export default function Search({
             children: bookedOnly ? 'Vapaat' : 'Varatut',
           })
         ),
-        searchMode === 'name'
-          ? React.createElement(TextInput, {
-              mode: 'outlined',
-              dense: true,
-              label: 'Kentan nimi',
-              value: nameInput,
-              onChangeText: setNameInput,
-              style: styles.textInput,
-            })
-          : null,
-        React.createElement(Button, {
-          mode: 'contained',
-          onPress: () => runSearch(),
-          style: styles.searchButton,
-          contentStyle: styles.searchButtonContent,
-          labelStyle: styles.searchButtonLabel,
-          disabled: isLoading,
-          children: 'Hae kentat',
-        })
       ),
       React.createElement(
         Surface,
@@ -487,6 +838,74 @@ export default function Search({
       React.createElement(
         Modal,
         {
+          visible: isPlacePickerOpen,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setIsPlacePickerOpen(false),
+        },
+        React.createElement(
+          Pressable,
+          {
+            style: styles.modalBackdrop,
+            onPress: () => setIsPlacePickerOpen(false),
+          },
+          React.createElement(
+            Pressable,
+            {
+              style: styles.modalPickerCard,
+              onPress: () => undefined,
+            },
+            React.createElement(Text, {
+              style: styles.modalPickerTitle,
+              children: 'Valitse paikka',
+            }),
+            React.createElement(
+              ScrollView,
+              {
+                style: styles.sportPickerList,
+                contentContainerStyle: styles.sportPickerListContent,
+              },
+              placeOptions.length > 0
+                ? placeOptions.map((option) =>
+                    React.createElement(
+                      Pressable,
+                      {
+                        key: option,
+                        style: [
+                          styles.sportOption,
+                          nameInput === option ? styles.sportOptionActive : null,
+                        ],
+                        onPress: () => selectPlace(option),
+                      },
+                      React.createElement(Text, {
+                        style: [
+                          styles.sportOptionText,
+                          nameInput === option ? styles.sportOptionTextActive : null,
+                        ],
+                        children: option,
+                      })
+                    )
+                  )
+                : React.createElement(Text, {
+                    style: styles.emptySportText,
+                    children: 'Paikkoja ei löytynyt tietokannasta.',
+                  })
+            ),
+            React.createElement(
+              View,
+              { style: styles.modalPickerActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsPlacePickerOpen(false),
+                children: 'Sulje',
+              })
+            )
+          )
+        )
+      ),
+      React.createElement(
+        Modal,
+        {
           visible: isDatePickerVisible,
           transparent: true,
           animationType: 'fade',
@@ -516,16 +935,13 @@ export default function Search({
               themeVariant: dark ? 'dark' : 'light',
               onChange: (event: DateTimePickerEvent, date?: Date) => {
                 if (!date || event.type === 'dismissed') {
-                  if (Platform.OS !== 'ios') {
-                    setIsDatePickerVisible(false);
-                  }
+                  setIsDatePickerVisible(false);
                   return;
                 }
                 setSelectedDate(date);
                 applyDateFilter(date);
-                if (Platform.OS !== 'ios') {
-                  setIsDatePickerVisible(false);
-                }
+                void runSearch();
+                setIsDatePickerVisible(false);
               },
             }),
             React.createElement(
@@ -555,7 +971,7 @@ export default function Search({
                 { style: styles.modalTopRow },
                 React.createElement(Text, {
                   style: styles.modalHall,
-                  children: selectedSection?.name ?? 'Nimeton kentta',
+                  children: selectedSection ? getFacilityName(selectedSection) : '-',
                 }),
                 React.createElement(Text, {
                   style: styles.modalTime,
@@ -564,16 +980,56 @@ export default function Search({
               ),
               React.createElement(Text, {
                 style: styles.modalSubLine,
-                children: `Laji: ${selectedSection?.sport ?? 'Ei tiedossa'}`,
+                children: selectedSection ? getSportAndFieldLabel(selectedSection) : '-',
               }),
               React.createElement(
-                View,
-                { style: styles.mapPlaceholder },
-                React.createElement(Text, {
-                  style: styles.mapPin,
-                  children: 'PIN',
-                })
+                Pressable,
+                {
+                  style: styles.mapPlaceholder,
+                  onPress: () => void openInMaps(),
+                  onLayout: onMapViewportLayout,
+                },
+                mapPreview
+                  ? React.createElement(
+                      View,
+                      {
+                        style: [
+                          styles.mapCanvas,
+                          {
+                            left: mapCanvasOffset.left,
+                            top: mapCanvasOffset.top,
+                          },
+                        ],
+                      },
+                      ...mapPreview.tiles.map((tile) =>
+                        React.createElement(Image, {
+                          key: tile.key,
+                          source: { uri: tile.uri },
+                          style: [styles.mapTile, { left: tile.left, top: tile.top }],
+                          resizeMode: 'cover',
+                        })
+                      )
+                    )
+                  : React.createElement(Text, {
+                      style: styles.mapPin,
+                      children: 'Karttaa ladataan...',
+                    }),
+                mapPreview
+                  ? React.createElement(View, {
+                      style: [
+                        styles.mapDot,
+                        {
+                          left: '50%',
+                          top: '50%',
+                        },
+                      ],
+                    })
+                  : null
               ),
+              React.createElement(Text, {
+                style: styles.modalSubLine,
+                children: `Osoite: ${selectedSection ? getFacilityAddress(selectedSection) ?? 'Ei saatavilla' : '-'}`,
+              }),
               React.createElement(Text, {
                 style: styles.modalSubLine,
                 children: `Kuvaus: ${selectedSection?.description ?? 'Ei kuvausta'}`,
@@ -624,8 +1080,10 @@ const createStyles = (
       paddingHorizontal: metrics.scale(14, 10, 20),
       paddingTop: metrics.scale(10, 8, 14),
       paddingBottom: metrics.scale(14, 10, 20),
+      alignItems: 'center',
     },
     headerRow: {
+      width: '100%',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -667,17 +1125,20 @@ const createStyles = (
       justifyContent: 'center',
       alignItems: 'center',
       alignSelf: 'center',
-      gap: metrics.scale(8, 6, 12),
+      width: '100%',
+      gap: metrics.scale(5, 4, 8),
     },
     filterChip: {
-      minWidth: metrics.scale(86, 72, 120),
+      minWidth: metrics.scale(76, 64, 104),
+      minHeight: metrics.scale(34, 30, 40),
       justifyContent: 'center',
       backgroundColor: colors.surfaceVariant,
     },
     filterChipText: {
-      fontSize: metrics.scale(14, 12, 18),
+      fontSize: metrics.scale(12, 11, 15),
       fontWeight: '600',
       color: colors.onSurface,
+      textAlign: 'center',
     },
     textInput: {
       marginTop: metrics.scale(10, 8, 14),
@@ -685,19 +1146,23 @@ const createStyles = (
     },
     sportPickerButton: {
       marginTop: metrics.scale(10, 8, 14),
-      minHeight: metrics.scale(56, 48, 64),
+      alignSelf: 'center',
+      width: '100%',
+      maxWidth: metrics.scale(320, 230, 380),
+      minHeight: metrics.scale(50, 44, 58),
       borderRadius: metrics.scale(14, 12, 18),
       backgroundColor: '#ffffff',
       borderWidth: 1,
       borderColor: '#cfd8e3',
       justifyContent: 'center',
-      paddingHorizontal: metrics.scale(14, 12, 18),
+      paddingHorizontal: metrics.scale(12, 10, 16),
       gap: 4,
     },
     sportPickerLabel: {
       color: '#0f172a',
       fontSize: metrics.scale(16, 14, 20),
       fontWeight: '700',
+      textAlign: 'center',
     },
     sportPickerHint: {
       color: '#64748b',
@@ -718,13 +1183,16 @@ const createStyles = (
     searchButton: {
       marginTop: metrics.scale(12, 10, 16),
       borderRadius: metrics.scale(12, 10, 16),
+      alignSelf: 'center',
+      width: metrics.scale(200, 168, 240),
     },
     searchButtonContent: {
-      height: metrics.scale(40, 36, 48),
+      height: metrics.scale(36, 34, 42),
     },
     searchButtonLabel: {
       fontSize: metrics.scale(16, 14, 20),
       fontWeight: '700',
+      textAlign: 'center',
     },
     dateButton: {
       marginTop: 0,
@@ -886,17 +1354,40 @@ const createStyles = (
     mapPlaceholder: {
       marginTop: metrics.scale(10, 8, 14),
       marginBottom: metrics.scale(12, 10, 18),
-      height: metrics.scale(76, 60, 110),
-      borderRadius: 2,
+      width: '100%',
+      height: metrics.scale(140, 110, 180),
+      borderRadius: metrics.scale(12, 10, 16),
       backgroundColor: colors.surfaceVariant,
       justifyContent: 'center',
-      alignItems: 'flex-start',
-      paddingLeft: metrics.scale(24, 18, 30),
+      alignItems: 'center',
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    mapCanvas: {
+      position: 'absolute',
+      width: 768,
+      height: 768,
+    },
+    mapTile: {
+      position: 'absolute',
+      width: 256,
+      height: 256,
     },
     mapPin: {
-      fontSize: metrics.scale(18, 14, 22),
+      fontSize: metrics.scale(14, 12, 18),
       color: colors.onSurfaceVariant,
       fontWeight: '700',
+    },
+    mapDot: {
+      position: 'absolute',
+      width: metrics.scale(14, 12, 16),
+      height: metrics.scale(14, 12, 16),
+      borderRadius: metrics.scale(7, 6, 8),
+      backgroundColor: '#dc2626',
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      marginLeft: -7,
+      marginTop: -7,
     },
     reserveButton: {
       marginTop: metrics.scale(18, 12, 24),
