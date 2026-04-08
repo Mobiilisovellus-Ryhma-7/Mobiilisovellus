@@ -108,7 +108,7 @@ function toIsoDate(value: unknown): string | null {
 function mapSection(id: string, data: Record<string, unknown>): FacilitySection {
   return {
     id,
-    facilityId: asNullableString(data.facilityId ?? data.facility_id),
+    facilityId: asNullableString(data.facilityId ?? data.facility_id ?? data.facility_Id),
     name: asNullableString(data.name),
     sport: asNullableString(data.sport),
     description: asNullableString(data.description),
@@ -141,25 +141,7 @@ export async function listFacilitySections() {
 export async function searchFacilitySectionsBySport(sport: string) {
   const normalizedSport = normalize(sport);
   const sections = await fetchAllFacilitySections();
-  return sections.filter((section) => {
-    const sectionSport = normalize(section.sport ?? '');
-
-    if (!sectionSport || !normalizedSport) {
-      return false;
-    }
-
-    if (sectionSport === normalizedSport) {
-      return true;
-    }
-
-    // Handle values like "Jalkapallo / Futsal" or comma-separated sports.
-    const tokens = sectionSport
-      .split(/[,;/|]/)
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    return tokens.includes(normalizedSport) || sectionSport.includes(normalizedSport);
-  });
+  return sections.filter((section) => normalize(section.sport ?? '') === normalizedSport);
 }
 
 export async function searchFacilitySectionsByName(name: string) {

@@ -10,10 +10,12 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ActivityIndicator, Button, Switch, Text, TextInput, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, Switch, Text, useTheme } from 'react-native-paper';
+import { collection, getDocs } from 'firebase/firestore';
 import { getResponsiveMetrics } from '../shared/responsive';
 import Screen from '../shared/Screen';
 import {
+  db,
   listFacilitySections,
   searchFacilitySectionsByBookingStatus,
   searchFacilitySectionsByName,
@@ -22,7 +24,7 @@ import {
 
 type SelectProps = {
   onBack?: () => void;
-  onSearch?: (params?: { mode?: SearchMode; sport?: string; booked?: boolean }) => void;
+  onSearch?: (params?: { mode?: SearchMode; sport?: string; name?: string; booked?: boolean }) => void;
 };
 
 type SearchMode = 'all' | 'sport' | 'name' | 'status';
@@ -32,12 +34,17 @@ type SportOption = {
   value: string;
 };
 
+type NameOption = {
+  label: string;
+  value: string;
+};
+
 const SEARCH_MODES: SearchMode[] = ['all', 'sport', 'name', 'status'];
 
 const MODE_LABELS: Record<SearchMode, string> = {
   all: 'Kaikki',
   sport: 'Laji',
-  name: 'Nimi',
+  name: 'Paikka',
   status: 'Varaustila',
 };
 
@@ -47,11 +54,13 @@ export default function Select({ onBack, onSearch }: SelectProps) {
   const metrics = getResponsiveMetrics(width);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isSportPickerOpen, setIsSportPickerOpen] = React.useState(false);
+  const [isNamePickerOpen, setIsNamePickerOpen] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
   const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
   const [searchMode, setSearchMode] = React.useState<SearchMode>('all');
   const [sport, setSport] = React.useState('');
   const [sportOptions, setSportOptions] = React.useState<SportOption[]>([]);
+  const [nameOptions, setNameOptions] = React.useState<NameOption[]>([]);
   const [name, setName] = React.useState('');
   const [bookedOnly, setBookedOnly] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -62,7 +71,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
     let isActive = true;
 
     listFacilitySections()
-      .then((sections) => {
+      .then(async (sections) => {
         if (!isActive) {
           return;
         }
@@ -76,6 +85,28 @@ export default function Select({ onBack, onSearch }: SelectProps) {
         ).sort((left, right) => left.localeCompare(right, 'fi'));
 
         setSportOptions(uniqueSports.map((value) => ({ label: value, value })));
+
+        if (db) {
+          const facilitiesSnapshot = await getDocs(collection(db, 'facilities'));
+          if (!isActive) {
+            return;
+          }
+
+          const uniqueFacilityNames = Array.from(
+            new Set(
+              facilitiesSnapshot.docs
+                .map((doc) => {
+                  const data = doc.data() as { name?: unknown };
+                  return typeof data.name === 'string' ? data.name.trim() : '';
+                })
+                .filter((facilityName): facilityName is string => !!facilityName)
+            )
+          ).sort((left, right) => left.localeCompare(right, 'fi'));
+
+          setNameOptions(uniqueFacilityNames.map((value) => ({ label: value, value })));
+        } else {
+          setNameOptions([]);
+        }
       })
       .catch(() => {
         if (!isActive) {
@@ -83,6 +114,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
         }
 
         setSportOptions([]);
+        setNameOptions([]);
       });
 
     return () => {
@@ -112,11 +144,34 @@ export default function Select({ onBack, onSearch }: SelectProps) {
       } else if (mode === 'name') {
         const nameValue = name.trim();
         if (!nameValue) {
-          throw new Error('Syötä kentän nimi ennen hakua.');
+          throw new Error('Valitse hallin paikka ennen hakua.');
         }
-        sections = await searchFacilitySectionsByName(nameValue);
+
+        if (!db) {
+          throw new Error('Tietokantayhteys puuttuu.');
+        }
+
+        const [facilitiesSnapshot, allSections] = await Promise.all([
+          getDocs(collection(db, 'facilities')),
+          listFacilitySections(),
+        ]);
+
+        const normalizedNameValue = nameValue.trim().toLowerCase();
+        const matchingFacilityIds = new Set(
+          facilitiesSnapshot.docs
+            .filter((doc) => {
+              const data = doc.data() as { name?: unknown };
+              const facilityName = typeof data.name === 'string' ? data.name.trim().toLowerCase() : '';
+              return facilityName.includes(normalizedNameValue);
+            })
+            .map((doc) => doc.id)
+        );
+
+        sections = allSections.filter(
+          (section) => !!section.facilityId && matchingFacilityIds.has(section.facilityId)
+        );
         setResultCount(sections.length);
-        onSearch?.({ mode });
+        onSearch?.({ mode, name: nameValue });
       } else if (mode === 'status') {
         sections = await searchFacilitySectionsByBookingStatus(bookedOnly);
         setResultCount(sections.length);
@@ -140,12 +195,28 @@ export default function Select({ onBack, onSearch }: SelectProps) {
     setIsSportPickerOpen(true);
   }, []);
 
+  const openNamePicker = React.useCallback(() => {
+    setSearchMode('name');
+    setErrorMessage(null);
+    setIsNamePickerOpen(true);
+  }, []);
+
   const selectSport = React.useCallback(
     (value: string) => {
       setSport(value);
       setSearchMode('sport');
       setErrorMessage(null);
       setIsSportPickerOpen(false);
+    },
+    []
+  );
+
+  const selectName = React.useCallback(
+    (value: string) => {
+      setName(value);
+      setSearchMode('name');
+      setErrorMessage(null);
+      setIsNamePickerOpen(false);
     },
     []
   );
@@ -199,7 +270,12 @@ export default function Select({ onBack, onSearch }: SelectProps) {
                   styles.modeButton,
                   searchMode === mode ? styles.modeButtonActive : null,
                 ],
-                  onPress: mode === 'sport' ? openSportPicker : () => setSearchMode(mode),
+                onPress:
+                  mode === 'sport'
+                    ? openSportPicker
+                    : mode === 'name'
+                      ? openNamePicker
+                      : () => setSearchMode(mode),
               },
               React.createElement(Text, {
                 style: [
@@ -229,13 +305,21 @@ export default function Select({ onBack, onSearch }: SelectProps) {
             )
           : null,
         searchMode === 'name'
-          ? React.createElement(TextInput, {
-              mode: 'outlined',
-              label: 'Kentän nimi',
-              value: name,
-              onChangeText: setName,
-              style: styles.textInput,
-            })
+          ? React.createElement(
+              Pressable,
+              {
+                style: styles.sportPickerButton,
+                onPress: openNamePicker,
+              },
+              React.createElement(Text, {
+                style: styles.sportPickerLabel,
+                children: name || 'Valitse halli listasta',
+              }),
+              React.createElement(Text, {
+                style: styles.sportPickerHint,
+                children: 'Avaa paikka-valikko',
+              })
+            )
           : null,
         searchMode === 'status'
           ? React.createElement(
@@ -326,6 +410,74 @@ export default function Select({ onBack, onSearch }: SelectProps) {
               React.createElement(Button, {
                 mode: 'text',
                 onPress: () => setIsSportPickerOpen(false),
+                children: 'Sulje',
+              })
+            )
+          )
+        )
+      ),
+      React.createElement(
+        Modal,
+        {
+          visible: isNamePickerOpen,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setIsNamePickerOpen(false),
+        },
+        React.createElement(
+          Pressable,
+          {
+            style: styles.modalBackdrop,
+            onPress: () => setIsNamePickerOpen(false),
+          },
+          React.createElement(
+            Pressable,
+            {
+              style: styles.sportPickerCard,
+              onPress: () => undefined,
+            },
+            React.createElement(Text, {
+              style: styles.modalTitle,
+              children: 'Valitse halli',
+            }),
+            React.createElement(
+              ScrollView,
+              {
+                style: styles.sportPickerList,
+                contentContainerStyle: styles.sportPickerListContent,
+              },
+              nameOptions.length > 0
+                ? nameOptions.map((option) =>
+                    React.createElement(
+                      Pressable,
+                      {
+                        key: option.value,
+                        style: [
+                          styles.sportOption,
+                          name === option.value ? styles.sportOptionActive : null,
+                        ],
+                        onPress: () => selectName(option.value),
+                      },
+                      React.createElement(Text, {
+                        style: [
+                          styles.sportOptionText,
+                          name === option.value ? styles.sportOptionTextActive : null,
+                        ],
+                        children: option.label,
+                      })
+                    )
+                  )
+                : React.createElement(Text, {
+                    style: styles.emptySportText,
+                    children: 'Halleja ei löytynyt tietokannasta.',
+                  })
+            ),
+            React.createElement(
+              View,
+              { style: styles.modalActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsNamePickerOpen(false),
                 children: 'Sulje',
               })
             )
