@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Button, Switch, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
 import {
   listFacilitySections,
@@ -180,7 +181,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
         React.createElement(View, { style: styles.headerSpacer })
       ),
       React.createElement(Image, {
-        source: require('../../assets/dynamic-sport-hall-logo.png'),
+        source: getDynamicSportHallLogoSource(dark),
         style: styles.logo,
         resizeMode: 'contain',
       }),

@@ -24,6 +24,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
 import {
   FacilitySection,
@@ -323,7 +324,7 @@ export default function Search({
           Pressable,
           { onPress: onGoHome },
           React.createElement(Image, {
-            source: require('../../assets/dynamic-sport-hall-logo.png'),
+            source: getDynamicSportHallLogoSource(dark),
             style: styles.logo,
             resizeMode: 'contain',
           })
