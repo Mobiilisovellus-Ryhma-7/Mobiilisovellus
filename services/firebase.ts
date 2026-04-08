@@ -3,6 +3,9 @@ import { getAuth } from 'firebase/auth';
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
+  getDoc,
   getDocs,
   getFirestore,
   limit,
@@ -354,6 +357,25 @@ export async function getBookingsForUserId(userId: string) {
 
       return b.bookingDate.localeCompare(a.bookingDate);
     });
+}
+
+export async function deleteBookingForUser(bookingId: string, userId: string) {
+  const firestore = getFirestoreClient();
+  const bookingRef = doc(firestore, BOOKINGS_COLLECTION, bookingId);
+  const bookingSnapshot = await getDoc(bookingRef);
+
+  if (!bookingSnapshot.exists()) {
+    throw new Error('Varausta ei loytynyt.');
+  }
+
+  const data = bookingSnapshot.data();
+  const bookingUserId = asNullableString(data.userId ?? data.user_id);
+
+  if (!bookingUserId || bookingUserId !== userId) {
+    throw new Error('Et voi poistaa toisen kayttajan varausta.');
+  }
+
+  await deleteDoc(bookingRef);
 }
 
 export async function createBooking(input: CreateBookingInput) {

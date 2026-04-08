@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+	Alert,
 	Image,
 	KeyboardAvoidingView,
 	Modal,
@@ -22,6 +23,7 @@ import {
 } from '../../services/auth';
 import {
 	Booking,
+	deleteBookingForUser,
 	FacilitySection,
 	getBookingsForUserId,
 	listFacilitySections,
@@ -62,6 +64,7 @@ export default function Profile({
 	const [passwordError, setPasswordError] = React.useState<string | null>(null);
 	const [showBookingsModal, setShowBookingsModal] = React.useState(false);
 	const [isLoadingBookings, setIsLoadingBookings] = React.useState(false);
+	const [deletingBookingId, setDeletingBookingId] = React.useState<string | null>(null);
 	const [bookingsError, setBookingsError] = React.useState<string | null>(null);
 	const [userBookings, setUserBookings] = React.useState<Booking[]>([]);
 	const [facilitySectionsById, setFacilitySectionsById] = React.useState<Record<string, FacilitySection>>({});
@@ -147,6 +150,43 @@ export default function Profile({
 
 		return `${match[3]}.${match[2]}.${match[1]}`;
 	}, []);
+
+	const confirmDeleteBooking = React.useCallback(
+		async (bookingId: string) => {
+			const userId = auth?.currentUser?.uid;
+
+			if (!userId) {
+				setBookingsError('Kirjaudu sisaan poistaaksesi varauksen.');
+				return;
+			}
+
+			setDeletingBookingId(bookingId);
+			setBookingsError(null);
+
+			try {
+				await deleteBookingForUser(bookingId, userId);
+				await loadUserBookings();
+			} catch (error) {
+				const message = error instanceof Error ? error.message : 'Varauksen poistaminen epaonnistui.';
+				setBookingsError(message);
+			} finally {
+				setDeletingBookingId(null);
+			}
+		},
+		[loadUserBookings]
+	);
+
+	const handleDeleteBooking = React.useCallback((bookingId: string) => {
+		Alert.alert(
+			'Oletko varma?',
+			'Tämä poistaa varauksen pysyvästi',
+			[
+				{ text: 'Peruuta', style: 'cancel' },
+				{ text: 'Kyllä', style: 'destructive', onPress: () => void confirmDeleteBooking(bookingId) },
+			],
+			{ cancelable: true }
+		);
+	}, [confirmDeleteBooking]);
 
 	const handleSignOut = React.useCallback(async () => {
 		setIsSigningOut(true);
@@ -458,10 +498,26 @@ export default function Profile({
 											style: styles.bookingMeta,
 											children: `${booking.slotStart}-${booking.slotEnd}`,
 										}),
-										React.createElement(Text, {
-											style: styles.bookingMeta,
-											children: `Status: ${booking.status}`,
-										})
+										React.createElement(
+											View,
+											{ style: styles.bookingFooterRow },
+											React.createElement(
+												Pressable,
+												{
+													style: [
+														styles.bookingCancelAction,
+														deletingBookingId === booking.id ? styles.bookingCancelActionDisabled : null,
+													],
+													onPress: () => void handleDeleteBooking(booking.id),
+													disabled: !!deletingBookingId,
+													accessibilityRole: 'button',
+												},
+												React.createElement(Text, {
+													style: styles.bookingCancelActionText,
+													children: deletingBookingId === booking.id ? 'Poistetaan...' : 'Peruuta',
+												})
+											)
+										)
 									);
 								}),
 							)
@@ -472,7 +528,7 @@ export default function Profile({
 							React.createElement(Button, {
 								mode: 'contained',
 								onPress: closeBookingsModal,
-								disabled: isLoadingBookings,
+								disabled: isLoadingBookings || !!deletingBookingId,
 								children: 'Sulje',
 							})
 						)
@@ -633,9 +689,9 @@ const createStyles = (
 			maxWidth: metrics.contentMaxWidth,
 			backgroundColor: colors.surface,
 			borderRadius: metrics.scale(16, 14, 22),
-			paddingHorizontal: metrics.scale(14, 12, 20),
-			paddingVertical: metrics.scale(14, 12, 20),
-			gap: metrics.scale(10, 8, 14),
+			paddingHorizontal: metrics.scale(12, 10, 16),
+			paddingVertical: metrics.scale(12, 10, 16),
+			gap: metrics.scale(6, 4, 8),
 		},
 		modalTitle: {
 			fontSize: metrics.scale(20, 17, 24),
@@ -648,51 +704,72 @@ const createStyles = (
 			color: colors.onSurfaceVariant,
 		},
 		modalActions: {
-			marginTop: metrics.scale(4, 2, 8),
+			marginTop: metrics.scale(2, 1, 4),
 			flexDirection: 'row',
 			justifyContent: 'flex-end',
 			alignItems: 'center',
-			gap: metrics.scale(8, 6, 12),
+			gap: metrics.scale(6, 4, 8),
 		},
 		bookingsList: {
-			maxHeight: metrics.scale(300, 220, 360),
+			maxHeight: metrics.scale(290, 210, 340),
 		},
 		bookingsListContent: {
-			gap: metrics.scale(10, 8, 14),
-			paddingVertical: metrics.scale(4, 2, 8),
+			gap: metrics.scale(8, 6, 10),
+			paddingVertical: metrics.scale(2, 0, 4),
 		},
 		bookingItem: {
-			borderRadius: metrics.scale(10, 8, 12),
-			paddingHorizontal: metrics.scale(10, 8, 12),
+			borderRadius: metrics.scale(12, 10, 14),
+			paddingHorizontal: metrics.scale(9, 7, 11),
 			paddingVertical: metrics.scale(8, 6, 10),
 			backgroundColor: colors.surfaceVariant,
-			gap: metrics.scale(2, 2, 4),
+			gap: metrics.scale(3, 2, 5),
 		},
 		bookingHeaderRow: {
 			flexDirection: 'row',
 			justifyContent: 'space-between',
 			alignItems: 'flex-start',
-			gap: metrics.scale(8, 6, 10),
+			gap: metrics.scale(6, 4, 8),
 		},
 		bookingFacilityName: {
 			flex: 1,
-			fontSize: metrics.scale(15, 13, 17),
+			fontSize: metrics.scale(13, 12, 15),
 			fontWeight: '700',
 			color: colors.onSurface,
 		},
 		bookingDate: {
-			fontSize: metrics.scale(12, 11, 14),
+			fontSize: metrics.scale(10, 10, 12),
 			fontWeight: '600',
 			color: colors.onSurfaceVariant,
 		},
 		bookingTitle: {
-			fontSize: metrics.scale(14, 13, 16),
+			fontSize: metrics.scale(12, 11, 14),
 			fontWeight: '600',
 			color: colors.onSurfaceVariant,
 		},
 		bookingMeta: {
-			fontSize: metrics.scale(13, 12, 15),
+			fontSize: metrics.scale(11, 10, 13),
 			color: colors.onSurfaceVariant,
+		},
+		bookingFooterRow: {
+			marginTop: metrics.scale(1, 0, 2),
+			flexDirection: 'row',
+			alignItems: 'center',
+			justifyContent: 'flex-end',
+			gap: metrics.scale(8, 6, 10),
+		},
+		bookingCancelAction: {
+			paddingHorizontal: metrics.scale(4, 2, 6),
+			paddingVertical: metrics.scale(1, 0, 2),
+			borderRadius: metrics.scale(6, 4, 8),
+			alignSelf: 'flex-end',
+		},
+		bookingCancelActionDisabled: {
+			opacity: 0.6,
+		},
+		bookingCancelActionText: {
+			fontSize: metrics.scale(10, 9, 12),
+			fontWeight: '700',
+			color: '#b91c1c',
 		},
 		signOutButton: {
 			marginTop: metrics.scale(12, 10, 18),
