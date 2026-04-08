@@ -196,3 +196,4 @@ INSERT INTO bookings (id, status, booking_time, user_id, section_id) VALUES
 ('44444444-4444-4444-4444-444444444442', 'confirmed', NOW(), '11111111-1111-1111-1111-111111111112', '33333333-3333-3333-3333-333333333332');
 
 COMMIT;
+--kikkeli
