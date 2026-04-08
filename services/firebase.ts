@@ -173,7 +173,9 @@ function mapSection(
   data: Record<string, unknown>,
   facilitiesById: Map<string, Facility>
 ): FacilitySection {
-  const facilityId = asNullableString(data.facilityId ?? data.facility_id ?? data.facility_Id);
+  const facilityId = asNullableString(
+    data.facilityId ?? data.facility_id ?? data.facility_Id
+  );
   const facility = facilityId ? facilitiesById.get(facilityId) : undefined;
 
   return {
@@ -275,10 +277,11 @@ async function countActiveBookingsForUser(userId: string) {
 
   const todayDate = getTodayDateKey();
   const nowTime = getNowTimeKey();
-
-  return snapshot.docs
+  const activeBookings = snapshot.docs
     .map((doc) => mapBooking(doc.id, doc.data()))
-    .filter((booking) => isActiveBooking(booking, todayDate, nowTime)).length;
+    .filter((booking) => isActiveBooking(booking, todayDate, nowTime));
+
+  return activeBookings.length;
 }
 
 export async function listFacilitySections() {
@@ -332,7 +335,7 @@ export async function createBooking(input: CreateBookingInput) {
   const firestore = getFirestoreClient();
   const activeBookingsCount = await countActiveBookingsForUser(input.userId);
   if (activeBookingsCount >= MAX_ACTIVE_BOOKINGS_PER_USER) {
-    throw new Error('Sinulla voi olla enintaan 2 aktiivista varausta.');
+    throw new Error('Sinulla voi olla enintään 2 aktiivista varausta.');
   }
 
   const payload = {

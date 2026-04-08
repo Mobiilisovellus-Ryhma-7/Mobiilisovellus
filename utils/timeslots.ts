@@ -24,7 +24,7 @@ function formatTime(hour: number, minute: number) {
   return `${pad(hour)}:${pad(minute)}`;
 }
 
-function isSameDay(left: Date, right: Date) {
+function sameDay(left: Date, right: Date) {
   return (
     left.getFullYear() === right.getFullYear() &&
     left.getMonth() === right.getMonth() &&
@@ -33,7 +33,7 @@ function isSameDay(left: Date, right: Date) {
 }
 
 function isPastSlot(slotStart: Date, selectedDay: Date, now: Date) {
-  if (!isSameDay(selectedDay, now)) {
+  if (!sameDay(selectedDay, now)) {
     return false;
   }
 
