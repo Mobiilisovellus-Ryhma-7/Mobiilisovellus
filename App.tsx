@@ -5,11 +5,16 @@ import { PaperProvider } from 'react-native-paper';
 import { darkAppTheme, lightAppTheme } from './navigation/theme';
 import FirestoreConnectionTest from './test/FirestoreConnectionTest';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initializeNotifications } from './services/notifications';
 
 const SHOW_FIRESTORE_TEST = true;
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    void initializeNotifications();
+  }, []);
 
   const paperTheme = isDarkMode ? darkAppTheme : lightAppTheme;
   const navigationTheme = React.useMemo(
