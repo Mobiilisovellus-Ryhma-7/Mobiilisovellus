@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../services/firebase';
@@ -23,7 +24,7 @@ export default function MainPage({
   onOpenLogin,
   onOpenProfile,
 }: MainPageProps) {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
@@ -52,7 +53,7 @@ export default function MainPage({
         View,
         { style: styles.topSection },
         React.createElement(Image, {
-          source: require('../../assets/dynamic-sport-hall-logo.png'),
+          source: getDynamicSportHallLogoSource(dark),
           style: styles.logo,
           resizeMode: 'contain',
         }),

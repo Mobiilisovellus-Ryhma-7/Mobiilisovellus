@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
+import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
 import { auth } from '../../services/firebase';
 import {
@@ -34,7 +35,7 @@ export default function Profile({
 	isDarkMode,
 	onToggleDarkMode,
 }: ProfileProps) {
-	const { colors } = useTheme();
+	const { colors, dark } = useTheme();
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const userEmail = auth?.currentUser?.email ?? 'Käyttäjänimi';
@@ -174,7 +175,7 @@ export default function Profile({
 				Pressable,
 				{ onPress: onGoHome },
 				React.createElement(Image, {
-					source: require('../../assets/dynamic-sport-hall-logo.png'),
+					source: getDynamicSportHallLogoSource(dark),
 					style: styles.logo,
 					resizeMode: 'contain',
 				})
