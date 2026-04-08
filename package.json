@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "db:seed:firestore": "node scripts/seed-firestore-from-sql.js",
     "db:seed:firestore:dry": "node scripts/seed-firestore-from-sql.js --dry-run",
-    "db:seed:firestore:no-reset": "node scripts/seed-firestore-from-sql.js --no-reset"
+    "db:seed:firestore:no-reset": "node scripts/seed-firestore-from-sql.js --no-reset",
+    "db:seed:firestore:facility-sections": "node scripts/seed-firestore-from-sql.js --collections facility_sections"
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "8.4.4",

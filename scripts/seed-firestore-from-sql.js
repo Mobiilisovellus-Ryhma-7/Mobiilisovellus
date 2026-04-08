@@ -13,6 +13,7 @@ function parseArgs(argv) {
     dryRun: false,
     projectId: process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT,
     serviceAccountPath: process.env.GOOGLE_APPLICATION_CREDENTIALS || null,
+    collections: [],
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -32,6 +33,12 @@ function parseArgs(argv) {
       i += 1;
     } else if (arg === '--service-account' && argv[i + 1]) {
       args.serviceAccountPath = path.resolve(argv[i + 1]);
+      i += 1;
+    } else if (arg === '--collections' && argv[i + 1]) {
+      args.collections = argv[i + 1]
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
       i += 1;
     }
   }
@@ -233,19 +240,39 @@ function logSummary(parsed) {
   });
 }
 
+function selectCollections(parsed, requestedCollections) {
+  if (!requestedCollections.length) {
+    return parsed;
+  }
+
+  const missing = requestedCollections.filter((name) => !Object.prototype.hasOwnProperty.call(parsed, name));
+  if (missing.length > 0) {
+    throw new Error(
+      `Requested collections not found in SQL INSERT statements: ${missing.join(', ')}`
+    );
+  }
+
+  const selected = {};
+  requestedCollections.forEach((name) => {
+    selected[name] = parsed[name];
+  });
+  return selected;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   assertReadableFile(args.sqlFile);
 
   const sqlText = fs.readFileSync(args.sqlFile, 'utf8');
   const parsed = parseInserts(sqlText);
-  const collections = Object.keys(parsed);
+  const selected = selectCollections(parsed, args.collections);
+  const collections = Object.keys(selected);
 
   if (collections.length === 0) {
     throw new Error('No INSERT statements were parsed from SQL file.');
   }
 
-  logSummary(parsed);
+  logSummary(selected);
 
   if (args.dryRun) {
     console.log('Dry run only. No writes executed.');
@@ -281,7 +308,7 @@ async function main() {
 
   console.log('Writing documents to Firestore...');
   for (const collectionName of collections) {
-    await writeDocs(db, collectionName, parsed[collectionName]);
+    await writeDocs(db, collectionName, selected[collectionName]);
   }
 
   console.log('Done. Firestore seed completed.');
