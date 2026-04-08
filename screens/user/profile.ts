@@ -5,6 +5,7 @@ import {
 	Modal,
 	Platform,
 	Pressable,
+	ScrollView,
 	StyleSheet,
 	View,
 	useWindowDimensions,
@@ -19,6 +20,12 @@ import {
 	deleteCurrentUserAccount,
 	signOutUser,
 } from '../../services/auth';
+import {
+	Booking,
+	FacilitySection,
+	getBookingsForUserId,
+	listFacilitySections,
+} from '../../services/firebase';
 
 type ProfileProps = {
 	onBack?: () => void;
@@ -53,6 +60,11 @@ export default function Profile({
 	const [isChangingPassword, setIsChangingPassword] = React.useState(false);
 	const [passwordMessage, setPasswordMessage] = React.useState<string | null>(null);
 	const [passwordError, setPasswordError] = React.useState<string | null>(null);
+	const [showBookingsModal, setShowBookingsModal] = React.useState(false);
+	const [isLoadingBookings, setIsLoadingBookings] = React.useState(false);
+	const [bookingsError, setBookingsError] = React.useState<string | null>(null);
+	const [userBookings, setUserBookings] = React.useState<Booking[]>([]);
+	const [facilitySectionsById, setFacilitySectionsById] = React.useState<Record<string, FacilitySection>>({});
 
 	const openPasswordModal = React.useCallback(() => {
 		setPasswordError(null);
@@ -78,6 +90,63 @@ export default function Profile({
 
 		setShowDeleteModal(false);
 	}, [isDeletingAccount]);
+
+	const loadUserBookings = React.useCallback(async () => {
+		const userId = auth?.currentUser?.uid;
+
+		if (!userId) {
+			setBookingsError('Kirjaudu sisaan nahdaksesi varauksesi.');
+			setUserBookings([]);
+			return;
+		}
+
+		setIsLoadingBookings(true);
+		setBookingsError(null);
+
+		try {
+			const [bookings, sections] = await Promise.all([
+				getBookingsForUserId(userId),
+				listFacilitySections(),
+			]);
+
+			const sectionsById = sections.reduce<Record<string, FacilitySection>>((acc, section) => {
+				acc[section.id] = section;
+				return acc;
+			}, {});
+
+			setFacilitySectionsById(sectionsById);
+			setUserBookings(bookings);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Varausten haku epaonnistui.';
+			setBookingsError(message);
+			setFacilitySectionsById({});
+			setUserBookings([]);
+		} finally {
+			setIsLoadingBookings(false);
+		}
+	}, []);
+
+	const openBookingsModal = React.useCallback(async () => {
+		setShowBookingsModal(true);
+		await loadUserBookings();
+	}, [loadUserBookings]);
+
+	const closeBookingsModal = React.useCallback(() => {
+		if (isLoadingBookings) {
+			return;
+		}
+
+		setShowBookingsModal(false);
+	}, [isLoadingBookings]);
+
+	const formatBookingDate = React.useCallback((value: string) => {
+		const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+		if (!match) {
+			return value;
+		}
+
+		return `${match[3]}.${match[2]}.${match[1]}`;
+	}, []);
 
 	const handleSignOut = React.useCallback(async () => {
 		setIsSigningOut(true);
@@ -204,10 +273,14 @@ export default function Profile({
 						children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
 					})
 				),
-				React.createElement(Text, {
-					style: [styles.menuItem, { color: colors.onSurface }],
-					children: 'Omat varaukset',
-				}),
+				React.createElement(
+					Pressable,
+					{ onPress: openBookingsModal },
+					React.createElement(Text, {
+						style: [styles.menuItem, { color: colors.onSurface }],
+						children: 'Omat varaukset',
+					})
+				),
 				React.createElement(
 					Pressable,
 					{ onPress: openDeleteModal },
@@ -303,6 +376,105 @@ export default function Profile({
 									children: 'Tallenna',
 								})
 							)
+						)
+					)
+				)
+			),
+			React.createElement(
+				Modal,
+				{
+					visible: showBookingsModal,
+					transparent: true,
+					animationType: 'fade',
+					onRequestClose: closeBookingsModal,
+				},
+				React.createElement(
+					Pressable,
+					{ style: styles.modalBackdrop, onPress: closeBookingsModal },
+					React.createElement(
+						Pressable,
+						{ style: styles.modalCard, onPress: () => undefined },
+						React.createElement(Text, {
+							style: styles.modalTitle,
+							children: 'Omat varaukset',
+						}),
+						isLoadingBookings
+							? React.createElement(Text, {
+								style: styles.modalDescription,
+								children: 'Ladataan varauksia...',
+							})
+							: null,
+						bookingsError
+							? React.createElement(Text, {
+								style: styles.errorText,
+								children: bookingsError,
+							})
+							: null,
+						!isLoadingBookings && !bookingsError && userBookings.length === 0
+							? React.createElement(Text, {
+								style: styles.modalDescription,
+								children: 'Et ole tehnyt varauksia viela.',
+							})
+							: null,
+						!isLoadingBookings && !bookingsError && userBookings.length > 0
+							? React.createElement(
+								ScrollView,
+								{ style: styles.bookingsList, contentContainerStyle: styles.bookingsListContent },
+								userBookings.map((booking) => {
+									const section = facilitySectionsById[booking.facilitySectionId];
+									const facilityName =
+										section?.facilityName || section?.description || 'Tuntematon halli';
+									const sport = section?.sport?.trim() ?? '';
+									const sectionName = section?.name?.trim() ?? '';
+									const hasSportInName =
+										sport.length > 0 &&
+										sectionName.toLowerCase().includes(sport.toLowerCase());
+									const utilitiesText = sport && sectionName
+										? hasSportInName
+											? sectionName
+											: `${sport}, ${sectionName}`
+										: sport || sectionName || 'Tietoja ei saatavilla';
+
+									return React.createElement(
+										View,
+										{ key: booking.id, style: styles.bookingItem },
+										React.createElement(
+											View,
+											{ style: styles.bookingHeaderRow },
+											React.createElement(Text, {
+												style: styles.bookingFacilityName,
+												children: facilityName,
+											}),
+											React.createElement(Text, {
+												style: styles.bookingDate,
+												children: formatBookingDate(booking.bookingDate),
+											})
+										),
+										React.createElement(Text, {
+											style: styles.bookingTitle,
+											children: utilitiesText,
+										}),
+										React.createElement(Text, {
+											style: styles.bookingMeta,
+											children: `${booking.slotStart}-${booking.slotEnd}`,
+										}),
+										React.createElement(Text, {
+											style: styles.bookingMeta,
+											children: `Status: ${booking.status}`,
+										})
+									);
+								}),
+							)
+							: null,
+						React.createElement(
+							View,
+							{ style: styles.modalActions },
+							React.createElement(Button, {
+								mode: 'contained',
+								onPress: closeBookingsModal,
+								disabled: isLoadingBookings,
+								children: 'Sulje',
+							})
 						)
 					)
 				)
@@ -481,6 +653,46 @@ const createStyles = (
 			justifyContent: 'flex-end',
 			alignItems: 'center',
 			gap: metrics.scale(8, 6, 12),
+		},
+		bookingsList: {
+			maxHeight: metrics.scale(300, 220, 360),
+		},
+		bookingsListContent: {
+			gap: metrics.scale(10, 8, 14),
+			paddingVertical: metrics.scale(4, 2, 8),
+		},
+		bookingItem: {
+			borderRadius: metrics.scale(10, 8, 12),
+			paddingHorizontal: metrics.scale(10, 8, 12),
+			paddingVertical: metrics.scale(8, 6, 10),
+			backgroundColor: colors.surfaceVariant,
+			gap: metrics.scale(2, 2, 4),
+		},
+		bookingHeaderRow: {
+			flexDirection: 'row',
+			justifyContent: 'space-between',
+			alignItems: 'flex-start',
+			gap: metrics.scale(8, 6, 10),
+		},
+		bookingFacilityName: {
+			flex: 1,
+			fontSize: metrics.scale(15, 13, 17),
+			fontWeight: '700',
+			color: colors.onSurface,
+		},
+		bookingDate: {
+			fontSize: metrics.scale(12, 11, 14),
+			fontWeight: '600',
+			color: colors.onSurfaceVariant,
+		},
+		bookingTitle: {
+			fontSize: metrics.scale(14, 13, 16),
+			fontWeight: '600',
+			color: colors.onSurfaceVariant,
+		},
+		bookingMeta: {
+			fontSize: metrics.scale(13, 12, 15),
+			color: colors.onSurfaceVariant,
 		},
 		signOutButton: {
 			marginTop: metrics.scale(12, 10, 18),

@@ -1231,7 +1231,7 @@ export default function Search({
                   { style: styles.slotsContainer },
                   React.createElement(Text, {
                     style: styles.slotsTitle,
-                    children: 'Aikavalit tanaan',
+                    children: 'Aikavälit tänään',
                   }),
                   isLoadingSlots
                     ? React.createElement(ActivityIndicator, {

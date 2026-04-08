@@ -61,6 +61,7 @@ export type FirestoreHealthCheckResult = {
 export type FacilitySection = {
   id: string;
   facilityId: string | null;
+  facilityName: string | null;
   name: string | null;
   sport: string | null;
   description: string | null;
@@ -72,6 +73,7 @@ export type FacilitySection = {
 
 type Facility = {
   id: string;
+  name: string | null;
   openingStart: string | null;
   openingEnd: string | null;
 };
@@ -160,9 +162,13 @@ function parseOpeningHours(value: string | null): { openingStart: string | null;
 function mapFacility(id: string, data: Record<string, unknown>): Facility {
   const openingHours = asNullableString(data.openingHours ?? data.opening_hours);
   const parsed = parseOpeningHours(openingHours);
+  const name = asNullableString(
+    data.name ?? data.facilityName ?? data.facility_name ?? data.hallName ?? data.hall_name
+  );
 
   return {
     id,
+    name,
     openingStart: parsed.openingStart,
     openingEnd: parsed.openingEnd,
   };
@@ -179,6 +185,8 @@ function mapSection(
   return {
     id,
     facilityId,
+    facilityName:
+      facility?.name ?? asNullableString(data.facilityName ?? data.facility_name) ?? null,
     name: asNullableString(data.name),
     sport: asNullableString(data.sport),
     description: asNullableString(data.description),
@@ -326,6 +334,26 @@ export async function getBookingsForSectionOnDate(
       );
 
   return snapshot.docs.map((doc) => mapBooking(doc.id, doc.data()));
+}
+
+export async function getBookingsForUserId(userId: string) {
+  const firestore = getFirestoreClient();
+  const snapshot = await getDocs(
+    query(
+      collection(firestore, BOOKINGS_COLLECTION),
+      where('userId', '==', userId)
+    )
+  );
+
+  return snapshot.docs
+    .map((doc) => mapBooking(doc.id, doc.data()))
+    .sort((a, b) => {
+      if (a.bookingDate === b.bookingDate) {
+        return b.slotStart.localeCompare(a.slotStart);
+      }
+
+      return b.bookingDate.localeCompare(a.bookingDate);
+    });
 }
 
 export async function createBooking(input: CreateBookingInput) {
