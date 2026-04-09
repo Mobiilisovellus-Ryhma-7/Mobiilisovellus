@@ -63,7 +63,6 @@ export default function Select({ onBack, onSearch }: SelectProps) {
   const [name, setName] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [resultCount, setResultCount] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     let isActive = true;
@@ -123,7 +122,6 @@ export default function Select({ onBack, onSearch }: SelectProps) {
   const handleSearch = React.useCallback(async (modeOverride?: SearchMode, sportOverride?: string) => {
     const mode = modeOverride ?? searchMode;
     setErrorMessage(null);
-    setResultCount(null);
     setIsLoading(true);
 
     try {
@@ -137,7 +135,6 @@ export default function Select({ onBack, onSearch }: SelectProps) {
         sections = (await searchFacilitySectionsBySport(sportValue)).filter(
           (section) => section.isBooked !== true
         );
-        setResultCount(sections.length);
         onSearch?.({ mode, sport: sportValue });
       } else if (mode === 'name') {
         const nameValue = name.trim();
@@ -168,11 +165,9 @@ export default function Select({ onBack, onSearch }: SelectProps) {
         sections = allSections.filter(
           (section) => !!section.facilityId && matchingFacilityIds.has(section.facilityId)
         );
-        setResultCount(sections.length);
         onSearch?.({ mode, name: nameValue });
       } else {
         sections = await listFacilitySections();
-        setResultCount(sections.length);
         onSearch?.({ mode });
       }
     } catch (error) {
@@ -319,12 +314,6 @@ export default function Select({ onBack, onSearch }: SelectProps) {
           ? React.createElement(Text, {
               style: styles.errorText,
               children: errorMessage,
-            })
-          : null,
-        resultCount !== null
-          ? React.createElement(Text, {
-              style: styles.resultText,
-              children: `Löydetyt kentät: ${resultCount}`,
             })
           : null
       ),
@@ -671,11 +660,6 @@ const createStyles = (
       color: '#b91c1c',
       fontSize: metrics.scale(13, 11, 15),
       fontWeight: '500',
-    },
-    resultText: {
-      color: '#0f766e',
-      fontSize: metrics.scale(14, 12, 16),
-      fontWeight: '600',
     },
     selectedValue: {
       color: '#000000',

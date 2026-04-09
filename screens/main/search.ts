@@ -37,7 +37,6 @@ import {
   getBookingsForSectionOnDate,
   listFavoriteFacilityIds,
   listFacilitySections,
-  queueBookingConfirmationEmail,
   removeFavoriteFacility,
   searchFacilitySectionsByBookingStatus,
   searchFacilitySectionsBySport,
@@ -109,23 +108,6 @@ function timeToHour(value: string | null | undefined): number | null {
   }
 
   return hours;
-}
-
-function matchesDateFilter(section: FacilitySection, dateFilter: string | null): boolean {
-  if (!dateFilter) {
-    return true;
-  }
-
-  if (!section.createdAt) {
-    return false;
-  }
-
-  const parsedDate = new Date(section.createdAt);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return false;
-  }
-
-  return formatDateAsDbDate(parsedDate) === dateFilter;
 }
 
 function parseDateKeyToDate(dateKey: string) {
@@ -732,24 +714,6 @@ export default function Search({
         });
 
         const facilityName = getFacilityName(selectedSection);
-        const sectionName = getSportAndFieldLabel(selectedSection);
-        const userEmail = auth?.currentUser?.email;
-
-        if (userEmail) {
-          try {
-            await queueBookingConfirmationEmail({
-              toEmail: userEmail,
-              facilityName,
-              sectionName,
-              bookingDate,
-              slotStart: slot.start,
-              slotEnd: slot.end,
-              bookingId,
-            });
-          } catch {
-            // Booking stays confirmed even if email queue fails.
-          }
-        }
 
         await scheduleBookingReminder({
           facilityName,
@@ -818,9 +782,7 @@ export default function Search({
   }, [isSubmittingBooking, sectionBookings, todaySlots, styles]);
 
   const filteredSections = React.useMemo(() => {
-    const visibleSections = sections
-      .filter((section) => matchesDateFilter(section, activeDateFilter))
-      .filter((section) => {
+    const visibleSections = sections.filter((section) => {
         if (!showFavoritesOnly) {
           return true;
         }
@@ -1233,7 +1195,7 @@ export default function Search({
             textStyle: styles.filterChipText,
             selected: showFavoritesOnly,
             onPress: toggleFavoritesFilter,
-            children: showFavoritesOnly ? 'Suosikit ✓' : 'Suosikit',
+            children: 'Suosikit',
           })
         ),
       ),
