@@ -75,6 +75,15 @@ type MapPreview = {
   pointY: number;
 };
 
+const MAP_USER_AGENT =
+  'Mobiilisovellus/1.0 (+https://github.com/valtt/Mobiilisovellus; contact: maintainer)';
+const OSM_TILE_BASE_URL = 'https://tile.openstreetmap.org';
+const OSM_REQUEST_HEADERS = {
+  Accept: 'image/png,image/*;q=0.9,*/*;q=0.8',
+  'User-Agent': MAP_USER_AGENT,
+};
+const tileDataUriCache = new Map<string, string>();
+
 
 
 function formatDateAsDbDate(date: Date): string {
@@ -164,6 +173,44 @@ function latLonToTile(lat: number, lon: number, zoom: number) {
     ((1 - Math.log(Math.tan(latitudeRad) + 1 / Math.cos(latitudeRad)) / Math.PI) / 2) * n;
 
   return { x, y };
+}
+
+async function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Kartan kuvan muunnos epäonnistui.'));
+    reader.onloadend = () => {
+      const value = reader.result;
+      if (typeof value === 'string') {
+        resolve(value);
+        return;
+      }
+
+      reject(new Error('Kartan kuvan muunnos epäonnistui.'));
+    };
+
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchTileDataUri(tileUrl: string): Promise<string> {
+  const cached = tileDataUriCache.get(tileUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const response = await fetch(tileUrl, {
+    headers: OSM_REQUEST_HEADERS,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Karttatiilen lataus epäonnistui (${response.status}).`);
+  }
+
+  const tileBlob = await response.blob();
+  const dataUri = await blobToDataUri(tileBlob);
+  tileDataUriCache.set(tileUrl, dataUri);
+  return dataUri;
 }
 
 export default function Search({
@@ -625,7 +672,7 @@ export default function Search({
 
   const toggleFavoritesFilter = React.useCallback(() => {
     if (!currentUserId) {
-      Alert.alert('Kirjaudu sisaan', 'Sinun tulee kirjautua sisaan ennen suosikkien tarkastelua.');
+      Alert.alert('Kirjaudu sisään', 'Sinun tulee kirjautua sisään ennen suosikkien tarkastelua.');
       return;
     }
 
@@ -670,7 +717,7 @@ export default function Search({
 
         const message = error instanceof Error
           ? error.message
-          : 'Varausten lataus epaonnistui.';
+          : 'Varausten lataus epäonnistui.';
         setBookingError(message);
         setSectionBookings([]);
       })
@@ -695,7 +742,7 @@ export default function Search({
 
       const userId = auth?.currentUser?.uid;
       if (!userId) {
-        setBookingError('Kirjaudu sisaan varataksesi vuoron.');
+        setBookingError('Kirjaudu sisään varataksesi vuoron.');
         return;
       }
 
@@ -727,7 +774,7 @@ export default function Search({
       } catch (error) {
         const message = error instanceof Error
           ? error.message
-          : 'Varaus epaonnistui. Yrita uudelleen.';
+          : 'Varaus epäonnistui. Yritä uudelleen.';
         setBookingError(message);
       } finally {
         setIsSubmittingBooking(false);
@@ -835,7 +882,7 @@ export default function Search({
       const facilityName =
         facilityNameById[normalizeFacilityKey(section.facilityId)] ?? 'Tuntematon halli';
       const sportName = section.sport?.trim() || 'Tuntematon laji';
-      const rawSectionName = section.name?.trim() || 'Nimeton kentta';
+      const rawSectionName = section.name?.trim() || 'Nimeton kenttä';
       const sectionName = stripSportPrefixFromSectionName(rawSectionName, sportName);
       return `${facilityName}, ${sportName}, ${sectionName}`;
     },
@@ -850,7 +897,7 @@ export default function Search({
 
   const getSportAndFieldLabel = React.useCallback((section: FacilitySection) => {
     const sportName = section.sport?.trim() || 'Tuntematon laji';
-    const rawSectionName = section.name?.trim() || 'Nimeton kentta';
+    const rawSectionName = section.name?.trim() || 'Nimeton kenttä';
     const sectionName = stripSportPrefixFromSectionName(rawSectionName, sportName);
     return `${sportName}, ${sectionName}`;
   }, []);
@@ -874,13 +921,13 @@ export default function Search({
       const facilityKey = normalizeFacilityKey(section.facilityId);
 
       if (!facilityKey) {
-        setErrorMessage('Hallia ei voitu lisata suosikkeihin.');
+        setErrorMessage('Hallia ei voitu lisätä suosikkeihin.');
         return;
       }
 
       if (!currentUserId) {
         setErrorMessage(null);
-        Alert.alert('Kirjaudu sisaan', 'Sinun tulee kirjautua sisaan ennen suosikkien lisaamista.');
+        Alert.alert('Kirjaudu sisään', 'Sinun tulee kirjautua sisään ennen suosikkien lisäämistä.');
         return;
       }
 
@@ -914,7 +961,7 @@ export default function Search({
           }
           return next;
         });
-        setErrorMessage('Suosikin paivitys epaonnistui. Yrita uudelleen.');
+        setErrorMessage('Suosikin päivitys epäonnistui. Yritä uudelleen.');
       } finally {
         setIsSyncingFavoriteFacilityId(null);
       }
@@ -974,7 +1021,7 @@ export default function Search({
             headers: {
               Accept: 'application/json',
               'Accept-Language': 'fi',
-              'User-Agent': 'hallille-app/1.0 (expo)',
+              'User-Agent': MAP_USER_AGENT,
             },
           }
         );
@@ -1006,19 +1053,26 @@ export default function Search({
         const fracY = tileCoords.y - centerTileY;
         const tileSize = 256;
 
-        const tiles: MapTile[] = [];
+        const tileRequests: Array<Promise<MapTile>> = [];
         for (let row = -1; row <= 1; row += 1) {
           for (let col = -1; col <= 1; col += 1) {
             const tileX = centerTileX + col;
             const tileY = centerTileY + row;
-            tiles.push({
-              key: `${zoom}-${tileX}-${tileY}`,
-              uri: `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`,
-              left: (col + 1) * tileSize,
-              top: (row + 1) * tileSize,
-            });
+            const key = `${zoom}-${tileX}-${tileY}`;
+            const tileUrl = `${OSM_TILE_BASE_URL}/${zoom}/${tileX}/${tileY}.png`;
+
+            tileRequests.push(
+              fetchTileDataUri(tileUrl).then((uri) => ({
+                key,
+                uri,
+                left: (col + 1) * tileSize,
+                top: (row + 1) * tileSize,
+              }))
+            );
           }
         }
+
+        const tiles = await Promise.all(tileRequests);
 
         setMapPreview({
           tiles,
@@ -1509,7 +1563,9 @@ export default function Search({
                         ...mapPreview.tiles.map((tile) =>
                           React.createElement(Image, {
                             key: tile.key,
-                            source: { uri: tile.uri },
+                            source: {
+                              uri: tile.uri,
+                            },
                             style: [styles.mapTile, { left: tile.left, top: tile.top }],
                             resizeMode: 'cover',
                           })
