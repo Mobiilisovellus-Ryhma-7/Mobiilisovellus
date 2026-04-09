@@ -17,7 +17,7 @@
     "@react-navigation/native-stack": "^7.14.7",
     "datetimepicker": "^0.1.39",
     "expo": "^54.0.0",
-    "expo-notifications": "^55.0.17",
+    "expo-notifications": "~0.32.16",
     "expo-status-bar": "~3.0.9",
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
