@@ -37,6 +37,7 @@ import {
   getBookingsForSectionOnDate,
   listFavoriteFacilityIds,
   listFacilitySections,
+  queueBookingConfirmationEmail,
   removeFavoriteFacility,
   searchFacilitySectionsByBookingStatus,
   searchFacilitySectionsBySport,
@@ -721,7 +722,7 @@ export default function Search({
       setBookingFeedback(null);
 
       try {
-        await createBooking({
+        const bookingId = await createBooking({
           facilitySectionId: selectedSection.id,
           userId,
           bookingDate,
@@ -731,6 +732,25 @@ export default function Search({
         });
 
         const facilityName = getFacilityName(selectedSection);
+        const sectionName = getSportAndFieldLabel(selectedSection);
+        const userEmail = auth?.currentUser?.email;
+
+        if (userEmail) {
+          try {
+            await queueBookingConfirmationEmail({
+              toEmail: userEmail,
+              facilityName,
+              sectionName,
+              bookingDate,
+              slotStart: slot.start,
+              slotEnd: slot.end,
+              bookingId,
+            });
+          } catch {
+            // Booking stays confirmed even if email queue fails.
+          }
+        }
+
         await scheduleBookingReminder({
           facilityName,
           bookingDate,
@@ -839,8 +859,6 @@ export default function Search({
 
     return `Vuorot ${formatDateAsDisplayDate(selectedDay)}`;
   }, [slotDate]);
-
-  const filteredSections = React.useMemo(() => sections, [sections]);
 
   const placeOptions = React.useMemo(
     () =>
@@ -1206,16 +1224,6 @@ export default function Search({
             children: activeDateFilter
               ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
               : 'Pvm',
-          }),
-          React.createElement(Chip, {
-            mode: 'flat',
-            compact: true,
-            showSelectedCheck: false,
-            style: styles.filterChip,
-            textStyle: styles.filterChipText,
-            selected: searchMode === 'status',
-            onPress: toggleBookingStatus,
-            children: bookedOnly ? 'Vapaat' : 'Varatut',
           }),
           React.createElement(Chip, {
             mode: 'flat',
