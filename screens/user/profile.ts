@@ -26,11 +26,17 @@ import {
 } from '../../services/auth';
 import {
 	Booking,
+	getAllBookings,
 	deleteBookingForUser,
 	FacilitySection,
 	getBookingsForUserId,
 	listFacilitySections,
 } from '../../services/firebase';
+import {
+	buildCurrentMonthSportData,
+	buildStatisticsData,
+	StatisticsCharts,
+} from './statisticsCharts';
 
 type ProfileProps = {
 	onBack?: () => void;
@@ -47,6 +53,12 @@ export default function Profile({
 	isDarkMode,
 	onToggleDarkMode,
 }: ProfileProps) {
+	const today = new Date();
+	const currentYear = today.getFullYear();
+	const currentMonth = today.getMonth() + 1;
+	const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+	const previousMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
 	const { colors, dark } = useTheme();
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
@@ -75,10 +87,12 @@ export default function Profile({
 	const [passwordError, setPasswordError] = React.useState<string | null>(null);
 	const [showBookingsModal, setShowBookingsModal] = React.useState(false);
 	const [showBookingHistoryModal, setShowBookingHistoryModal] = React.useState(false);
+	const [showStatisticsModal, setShowStatisticsModal] = React.useState(false);
 	const [isLoadingBookings, setIsLoadingBookings] = React.useState(false);
 	const [deletingBookingId, setDeletingBookingId] = React.useState<string | null>(null);
 	const [bookingsError, setBookingsError] = React.useState<string | null>(null);
 	const [userBookings, setUserBookings] = React.useState<Booking[]>([]);
+	const [statisticsBookings, setStatisticsBookings] = React.useState<Booking[]>([]);
 	const [facilitySectionsById, setFacilitySectionsById] = React.useState<Record<string, FacilitySection>>({});
 	const [currentTimestamp, setCurrentTimestamp] = React.useState(() => Date.now());
 	const [profilePhotoUri, setProfilePhotoUri] = React.useState<string | null>(null);
@@ -251,6 +265,54 @@ export default function Profile({
 		setShowBookingHistoryModal(false);
 	}, [isLoadingBookings]);
 
+	const openStatisticsModal = React.useCallback(async () => {
+		setShowStatisticsModal(true);
+		const userId = auth?.currentUser?.uid;
+
+		if (!userId) {
+			setBookingsError('Kirjaudu sisaan nahdaksesi tilastot.');
+			setUserBookings([]);
+			setStatisticsBookings([]);
+			return;
+		}
+
+		setIsLoadingBookings(true);
+		setBookingsError(null);
+
+		try {
+			const [userBookingsResult, allBookingsResult, sections] = await Promise.all([
+				getBookingsForUserId(userId),
+				getAllBookings(),
+				listFacilitySections(),
+			]);
+
+			const sectionsById = sections.reduce<Record<string, FacilitySection>>((acc, section) => {
+				acc[section.id] = section;
+				return acc;
+			}, {});
+
+			setFacilitySectionsById(sectionsById);
+			setUserBookings(userBookingsResult);
+			setStatisticsBookings(allBookingsResult);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Tilastojen haku epaonnistui.';
+			setBookingsError(message);
+			setFacilitySectionsById({});
+			setUserBookings([]);
+			setStatisticsBookings([]);
+		} finally {
+			setIsLoadingBookings(false);
+		}
+	}, []);
+
+	const closeStatisticsModal = React.useCallback(() => {
+		if (isLoadingBookings) {
+			return;
+		}
+
+		setShowStatisticsModal(false);
+	}, [isLoadingBookings]);
+
 	const isPastBooking = React.useCallback((booking: Booking, nowTimestamp: number) => {
 		const match = booking.bookingDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 		const timeMatch = booking.slotEnd.match(/^(\d{2}):(\d{2})$/);
@@ -282,6 +344,66 @@ export default function Profile({
 		() => userBookings.filter((booking) => isPastBooking(booking, currentTimestamp)),
 		[currentTimestamp, isPastBooking, userBookings]
 	);
+
+	const statisticsData = React.useMemo(
+		() => buildStatisticsData(userBookings, facilitySectionsById),
+		[facilitySectionsById, userBookings]
+	);
+	const allUsersCurrentMonthSportData = React.useMemo(
+		() => buildCurrentMonthSportData(statisticsBookings, facilitySectionsById),
+		[facilitySectionsById, statisticsBookings]
+	);
+	const hasStatisticsData =
+		statisticsData.facilityData.length > 0 ||
+		statisticsData.sportData.length > 0 ||
+		allUsersCurrentMonthSportData.length > 0;
+
+	const trainingSummary = React.useMemo(() => {
+		let thisMonthSessions = 0;
+		let thisYearSessions = 0;
+		let previousMonthSessions = 0;
+
+		userBookings.forEach((booking) => {
+			const match = booking.bookingDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+			if (!match) {
+				return;
+			}
+
+			const year = Number(match[1]);
+			const month = Number(match[2]);
+
+			if (year === currentYear) {
+				thisYearSessions += 1;
+			}
+
+			if (year === currentYear && month === currentMonth) {
+				thisMonthSessions += 1;
+			}
+
+			if (year === previousMonthYear && month === previousMonth) {
+				previousMonthSessions += 1;
+			}
+		});
+
+		const monthDeltaPercent =
+			previousMonthSessions === 0
+				? thisMonthSessions === 0
+					? 0
+					: 100
+				: Math.round(((thisMonthSessions - previousMonthSessions) / previousMonthSessions) * 100);
+
+		const monthDeltaText =
+			monthDeltaPercent > 0
+				? `+${monthDeltaPercent}%`
+				: `${monthDeltaPercent}%`;
+
+		return {
+			thisMonthSessions,
+			thisYearSessions,
+			monthDeltaPercent,
+			monthDeltaText,
+		};
+	}, [currentMonth, currentYear, previousMonth, previousMonthYear, userBookings]);
 
 	React.useEffect(() => {
 		if (!showBookingsModal && !showBookingHistoryModal) {
@@ -578,6 +700,16 @@ export default function Profile({
 							labelStyle: styles.actionButtonLabel,
 							children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
 						}),
+							children: 'Varaushistoria',
+						}),
+						React.createElement(Button, {
+							mode: 'elevated',
+							onPress: openStatisticsModal,
+							style: styles.actionButton,
+							contentStyle: styles.actionButtonContent,
+							labelStyle: styles.actionButtonLabel,
+							children: 'Tilastot',
+						})
 					)
 				),
 				React.createElement(
@@ -908,6 +1040,114 @@ export default function Profile({
 			React.createElement(
 				Modal,
 				{
+					visible: showStatisticsModal,
+					transparent: true,
+					animationType: 'fade',
+					onRequestClose: closeStatisticsModal,
+				},
+				React.createElement(
+					Pressable,
+					{ style: styles.modalBackdrop, onPress: closeStatisticsModal },
+					React.createElement(
+						Pressable,
+						{ style: styles.modalCardLarge, onPress: () => undefined },
+						React.createElement(Text, {
+								style: [styles.modalTitle, styles.modalTitleCentered],
+							children: 'Tilastot',
+						}),
+						React.createElement(
+							View,
+							{ style: styles.trainingSummaryRow },
+							React.createElement(
+								View,
+								{ style: [styles.trainingSummaryCard, { backgroundColor: colors.surfaceVariant }] },
+								React.createElement(Text, {
+									style: [styles.trainingSummaryLabel, { color: colors.onSurfaceVariant }],
+									children: 'Omat treenit tässä kuukaudessa',
+								}),
+								React.createElement(Text, {
+									style: [styles.trainingSummaryValue, { color: colors.onSurface }],
+									children: `${trainingSummary.thisMonthSessions}`,
+								})
+							),
+							React.createElement(
+								View,
+								{ style: [styles.trainingSummaryCard, { backgroundColor: colors.surfaceVariant }] },
+								React.createElement(Text, {
+									style: [styles.trainingSummaryLabel, { color: colors.onSurfaceVariant }],
+									children: 'Muutos edelliseen kuukauteen',
+								}),
+								React.createElement(Text, {
+									style: [
+										styles.trainingSummaryValue,
+										{ color: trainingSummary.monthDeltaPercent < 0 ? '#b91c1c' : '#0f766e' },
+									],
+									children: trainingSummary.monthDeltaText,
+								})
+							),
+							React.createElement(
+								View,
+								{ style: [styles.trainingSummaryCard, { backgroundColor: colors.surfaceVariant }] },
+								React.createElement(Text, {
+									style: [styles.trainingSummaryLabel, { color: colors.onSurfaceVariant }],
+									children: 'Omat treenikerrat yhteensä',
+								}),
+								React.createElement(Text, {
+									style: [styles.trainingSummaryValue, { color: colors.onSurface }],
+									children: `${trainingSummary.thisYearSessions}`,
+								})
+							)
+						),
+						React.createElement(
+							ScrollView,
+							{
+								style: styles.statisticsScroll,
+								contentContainerStyle: styles.statisticsScrollContent,
+								showsVerticalScrollIndicator: true,
+							},
+							isLoadingBookings
+								? React.createElement(Text, {
+									style: styles.modalDescription,
+									children: 'Ladataan tilastoja...',
+								})
+								: null,
+							bookingsError
+								? React.createElement(Text, {
+									style: styles.errorText,
+									children: bookingsError,
+								})
+								: null,
+							!isLoadingBookings && !bookingsError && !hasStatisticsData
+								? React.createElement(Text, {
+									style: styles.modalDescription,
+									children: 'Ei tilastodataa naytettavaksi viela.',
+								})
+								: null,
+							!isLoadingBookings && !bookingsError && hasStatisticsData
+								? React.createElement(StatisticsCharts, {
+									currentMonthAllUsersSportData: allUsersCurrentMonthSportData,
+									facilityData: statisticsData.facilityData,
+									sportData: statisticsData.sportData,
+									timeData: statisticsData.timeData,
+								})
+								: null,
+						),
+						React.createElement(
+							View,
+							{ style: styles.modalActions },
+							React.createElement(Button, {
+								mode: 'contained',
+								onPress: closeStatisticsModal,
+								disabled: isLoadingBookings,
+								children: 'Sulje',
+							})
+						)
+					)
+				)
+			),
+			React.createElement(
+				Modal,
+				{
 					visible: showDeleteModal,
 					transparent: true,
 					animationType: 'fade',
@@ -1204,10 +1444,55 @@ const createStyles = (
 			paddingVertical: metrics.scale(12, 10, 16),
 			gap: metrics.scale(6, 4, 8),
 		},
+		modalCardLarge: {
+			width: '100%',
+			maxWidth: metrics.contentMaxWidth,
+			backgroundColor: colors.surface,
+			borderRadius: metrics.scale(16, 14, 22),
+			paddingHorizontal: metrics.scale(12, 10, 16),
+			paddingVertical: metrics.scale(12, 10, 16),
+			gap: metrics.scale(6, 4, 8),
+			maxHeight: metrics.scale(620, 520, 740),
+		},
+		statisticsScroll: {
+			maxHeight: metrics.scale(560, 420, 680),
+		},
+		statisticsScrollContent: {
+			paddingBottom: metrics.scale(8, 6, 12),
+		},
+		trainingSummaryRow: {
+			flexDirection: 'row',
+			gap: metrics.scale(8, 6, 10),
+			marginBottom: metrics.scale(6, 4, 10),
+		},
+		trainingSummaryCard: {
+			flex: 1,
+			borderRadius: metrics.scale(14, 12, 16),
+			paddingVertical: metrics.scale(10, 8, 12),
+			paddingHorizontal: metrics.scale(8, 7, 10),
+			alignItems: 'center',
+			justifyContent: 'center',
+			minWidth: 0,
+		},
+		trainingSummaryLabel: {
+			fontSize: metrics.scale(11, 10, 12),
+			fontWeight: '700',
+			textAlign: 'center',
+		},
+		trainingSummaryValue: {
+			marginTop: metrics.scale(3, 2, 4),
+			fontSize: metrics.scale(20, 17, 22),
+			fontWeight: '800',
+			textAlign: 'center',
+		},
 		modalTitle: {
 			fontSize: metrics.scale(20, 17, 24),
 			fontWeight: '700',
 			color: colors.onSurface,
+		},
+		modalTitleCentered: {
+			textAlign: 'center',
+			alignSelf: 'stretch',
 		},
 		modalDescription: {
 			fontSize: metrics.scale(14, 12, 18),

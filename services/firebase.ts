@@ -369,6 +369,21 @@ export async function getBookingsForUserId(userId: string) {
     });
 }
 
+export async function getAllBookings() {
+  const firestore = getFirestoreClient();
+  const snapshot = await getDocs(collection(firestore, BOOKINGS_COLLECTION));
+
+  return snapshot.docs
+    .map((doc) => mapBooking(doc.id, doc.data()))
+    .sort((a, b) => {
+      if (a.bookingDate === b.bookingDate) {
+        return b.slotStart.localeCompare(a.slotStart);
+      }
+
+      return b.bookingDate.localeCompare(a.bookingDate);
+    });
+}
+
 export async function deleteBookingForUser(bookingId: string, userId: string) {
   const firestore = getFirestoreClient();
   const bookingRef = doc(firestore, BOOKINGS_COLLECTION, bookingId);
