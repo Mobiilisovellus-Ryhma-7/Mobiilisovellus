@@ -48,6 +48,14 @@ export default function Profile({
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const userEmail = auth?.currentUser?.email ?? 'Käyttäjänimi';
+	const userInitial = React.useMemo(() => {
+		const trimmedEmail = userEmail.trim();
+		if (!trimmedEmail) {
+			return 'H';
+		}
+
+		return trimmedEmail.charAt(0).toUpperCase();
+	}, [userEmail]);
 	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
 	const [isSigningOut, setIsSigningOut] = React.useState(false);
 	const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
@@ -352,49 +360,141 @@ export default function Profile({
 			),
 
 			React.createElement(
-				View,
-				{ style: styles.menuWrap },
-				React.createElement(Text, {
-					style: [styles.menuItem, { color: colors.onSurface }],
-					children: userEmail,
-				}),
+				ScrollView,
+				{
+					style: styles.menuScroll,
+					contentContainerStyle: styles.menuContent,
+					showsVerticalScrollIndicator: false,
+				},
 				React.createElement(
-					Pressable,
-					{ onPress: openPasswordModal },
-					React.createElement(Text, {
-						style: [styles.menuItem, { color: colors.onSurface }],
-						children: 'Vaihda salasanasi',
-					})
+					View,
+					{ style: styles.heroCard },
+					React.createElement(
+						View,
+						{ style: styles.heroRow },
+						React.createElement(
+							View,
+							{ style: [styles.heroAvatar, { backgroundColor: colors.primary }] },
+							React.createElement(Text, {
+								style: [styles.heroAvatarText, { color: colors.onPrimary }],
+								children: userInitial,
+							})
+						),
+						React.createElement(
+							View,
+							{ style: styles.heroCopy },
+							React.createElement(Text, {
+								style: [styles.heroLabel, { color: colors.onSurfaceVariant }],
+								children: 'Käyttäjätili',
+							}),
+							React.createElement(Text, {
+								style: [styles.heroEmail, { color: colors.onSurface }],
+								children: userEmail,
+							}),
+							React.createElement(Text, {
+								style: [styles.heroSubtext, { color: colors.onSurfaceVariant }],
+								children: 'Hallitse salasanaa, varauksia ja sovelluksen ulkoasua.',
+							})
+						)
+					)
 				),
 				React.createElement(
-					Pressable,
-					{ onPress: onToggleDarkMode },
-					React.createElement(Text, {
-						style: [styles.menuItem, { color: colors.onSurface }],
-						children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
-					})
+					View,
+					{ style: styles.statsRow },
+					React.createElement(
+						View,
+						{ style: styles.statCard },
+						React.createElement(Text, {
+							style: [styles.statValue, { color: colors.onSurface }],
+							children: `${activeBookings.length}`,
+						}),
+						React.createElement(Text, {
+							style: [styles.statLabel, { color: colors.onSurfaceVariant }],
+							children: 'Aktiiviset varaukset',
+						})
+					),
+					React.createElement(
+						View,
+						{ style: styles.statCard },
+						React.createElement(Text, {
+							style: [styles.statValue, { color: colors.onSurface }],
+							children: `${bookingHistory.length}`,
+						}),
+						React.createElement(Text, {
+							style: [styles.statLabel, { color: colors.onSurfaceVariant }],
+							children: 'Historiassa',
+						})
+					),
+					React.createElement(
+						View,
+						{ style: styles.statCard },
+						React.createElement(Text, {
+							style: [styles.statValue, { color: colors.onSurface }],
+							children: isDarkMode ? 'Päällä' : 'Pois',
+						}),
+						React.createElement(Text, {
+							style: [styles.statLabel, { color: colors.onSurfaceVariant }],
+							children: 'Pimeä tila',
+						})
+					)
 				),
 				React.createElement(
-					Pressable,
-					{ onPress: openBookingsModal },
+					View,
+					{ style: styles.sectionCard },
 					React.createElement(Text, {
-						style: [styles.menuItem, { color: colors.onSurface }],
-						children: 'Omat varaukset',
-					})
+						style: [styles.sectionTitle, { color: colors.onSurface }],
+						children: 'Asetukset',
+					}),
+					React.createElement(
+						View,
+						{ style: styles.actionStack },
+						React.createElement(Button, {
+							mode: 'elevated',
+							onPress: openPasswordModal,
+							style: styles.actionButton,
+							contentStyle: styles.actionButtonContent,
+							labelStyle: styles.actionButtonLabel,
+							children: 'Vaihda salasanasi',
+						}),
+						React.createElement(Button, {
+							mode: 'contained-tonal',
+							onPress: onToggleDarkMode,
+							style: styles.actionButton,
+							contentStyle: styles.actionButtonContent,
+							labelStyle: styles.actionButtonLabel,
+							children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
+						}),
+						React.createElement(Button, {
+							mode: 'elevated',
+							onPress: openBookingsModal,
+							style: styles.actionButton,
+							contentStyle: styles.actionButtonContent,
+							labelStyle: styles.actionButtonLabel,
+							children: 'Omat varaukset',
+						}),
+						React.createElement(Button, {
+							mode: 'elevated',
+							onPress: openBookingHistoryModal,
+							style: styles.actionButton,
+							contentStyle: styles.actionButtonContent,
+							labelStyle: styles.actionButtonLabel,
+							children: 'Varaushistoria',
+						})
+					)
 				),
 				React.createElement(
-					Pressable,
-					{ onPress: openBookingHistoryModal },
+					View,
+					{ style: styles.sectionCardDanger },
 					React.createElement(Text, {
-						style: [styles.menuItem, { color: colors.onSurface }],
-						children: 'Varaushistoria',
-					})
-				),
-				React.createElement(
-					Pressable,
-					{ onPress: openDeleteModal },
-					React.createElement(Text, {
-						style: [styles.menuItemDanger, { color: '#b91c1c' }],
+						style: [styles.sectionTitle, { color: colors.onSurface }],
+						children: 'Tilin hallinta',
+					}),
+					React.createElement(Button, {
+						mode: 'outlined',
+						onPress: openDeleteModal,
+						style: styles.dangerButton,
+						contentStyle: styles.actionButtonContent,
+						labelStyle: styles.dangerButtonLabel,
 						children: 'Poista käyttäjätili',
 					})
 				),
@@ -821,6 +921,122 @@ const createStyles = (
 			height: metrics.scale(96, 74, 116),
 			alignSelf: 'center',
 			marginTop: metrics.scale(16, 10, 22),
+		},
+		menuScroll: {
+			width: '100%',
+			flex: 1,
+		},
+		menuContent: {
+			width: '100%',
+			maxWidth: metrics.contentMaxWidth,
+			paddingTop: metrics.scale(22, 16, 28),
+			paddingBottom: metrics.scale(28, 20, 34),
+			gap: metrics.scale(14, 10, 18),
+		},
+		heroCard: {
+			borderRadius: metrics.scale(24, 18, 30),
+			paddingHorizontal: metrics.scale(16, 12, 20),
+			paddingVertical: metrics.scale(16, 12, 20),
+			backgroundColor: colors.surface,
+		},
+		heroRow: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			gap: metrics.scale(14, 10, 18),
+		},
+		heroAvatar: {
+			width: metrics.scale(60, 52, 72),
+			height: metrics.scale(60, 52, 72),
+			borderRadius: metrics.scale(30, 26, 36),
+			alignItems: 'center',
+			justifyContent: 'center',
+			elevation: 0,
+		},
+		heroAvatarText: {
+			fontSize: metrics.scale(22, 18, 28),
+			fontWeight: '800',
+		},
+		heroCopy: {
+			flex: 1,
+			gap: metrics.scale(4, 3, 6),
+		},
+		heroLabel: {
+			fontSize: metrics.scale(12, 10, 14),
+			fontWeight: '700',
+			textTransform: 'uppercase',
+			letterSpacing: 0.8,
+		},
+		heroEmail: {
+			fontSize: metrics.scale(18, 15, 22),
+			fontWeight: '800',
+		},
+		heroSubtext: {
+			fontSize: metrics.scale(13, 11, 16),
+			lineHeight: metrics.scale(18, 16, 22),
+		},
+		statsRow: {
+			flexDirection: 'row',
+			flexWrap: 'wrap',
+			gap: metrics.scale(10, 8, 12),
+		},
+		statCard: {
+			flex: 1,
+			minWidth: metrics.scale(96, 88, 120),
+			borderRadius: metrics.scale(18, 14, 24),
+			paddingHorizontal: metrics.scale(12, 10, 16),
+			paddingVertical: metrics.scale(12, 10, 16),
+			backgroundColor: colors.surfaceVariant,
+		},
+		statValue: {
+			fontSize: metrics.scale(20, 17, 24),
+			fontWeight: '800',
+		},
+		statLabel: {
+			marginTop: metrics.scale(4, 2, 6),
+			fontSize: metrics.scale(12, 10, 14),
+			fontWeight: '600',
+		},
+		sectionCard: {
+			borderRadius: metrics.scale(24, 18, 30),
+			paddingHorizontal: metrics.scale(16, 12, 20),
+			paddingVertical: metrics.scale(16, 12, 20),
+			backgroundColor: colors.surface,
+			gap: metrics.scale(12, 10, 16),
+		},
+		sectionCardDanger: {
+			borderRadius: metrics.scale(24, 18, 30),
+			paddingHorizontal: metrics.scale(16, 12, 20),
+			paddingVertical: metrics.scale(16, 12, 20),
+			backgroundColor: colors.surface,
+			gap: metrics.scale(12, 10, 16),
+		},
+		sectionTitle: {
+			fontSize: metrics.scale(18, 16, 22),
+			fontWeight: '800',
+		},
+		actionStack: {
+			gap: metrics.scale(10, 8, 12),
+		},
+		actionButton: {
+			alignSelf: 'stretch',
+			borderRadius: metrics.scale(14, 12, 18),
+		},
+		actionButtonContent: {
+			height: metrics.scale(50, 44, 58),
+		},
+		actionButtonLabel: {
+			fontSize: metrics.scale(15, 13, 18),
+			fontWeight: '700',
+		},
+		dangerButton: {
+			alignSelf: 'stretch',
+			borderRadius: metrics.scale(14, 12, 18),
+			borderColor: '#ef4444',
+		},
+		dangerButtonLabel: {
+			fontSize: metrics.scale(15, 13, 18),
+			fontWeight: '700',
+			color: '#b91c1c',
 		},
 		menuWrap: {
 			width: '100%',
