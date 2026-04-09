@@ -4,6 +4,7 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   LayoutChangeEvent,
@@ -28,15 +29,19 @@ import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
 import {
+  addFavoriteFacility,
   auth,
   createBooking,
   FacilitySection,
   db,
   getBookingsForSectionOnDate,
+  listFavoriteFacilityIds,
   listFacilitySections,
+  removeFavoriteFacility,
   searchFacilitySectionsByBookingStatus,
   searchFacilitySectionsBySport,
 } from '../../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { scheduleBookingReminder } from '../../services/notifications';
 import { collection, getDocs } from 'firebase/firestore';
 import { buildDailyTimeSlots, formatDateKey, TimeSlot } from '../../utils/timeslots';
@@ -209,6 +214,10 @@ export default function Search({
   const [isDatePickerVisible, setIsDatePickerVisible] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(new Date());
   const [activeDateFilter, setActiveDateFilter] = React.useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(auth?.currentUser?.uid ?? null);
+  const [favoriteFacilityIds, setFavoriteFacilityIds] = React.useState<Set<string>>(new Set());
+  const [isSyncingFavoriteFacilityId, setIsSyncingFavoriteFacilityId] = React.useState<string | null>(null);
+  const [showFavoritesOnly, setShowFavoritesOnly] = React.useState(false);
   const [sectionBookings, setSectionBookings] = React.useState<string[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = React.useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = React.useState(false);
@@ -394,6 +403,37 @@ export default function Search({
     },
     [activeDateFilter, bookedOnly, nameInput, searchMode, sportInput]
   );
+
+  const loadFavoriteFacilities = React.useCallback(async (userId: string) => {
+    try {
+      const favorites = await listFavoriteFacilityIds(userId);
+      setFavoriteFacilityIds(new Set(favorites));
+    } catch {
+      setFavoriteFacilityIds(new Set());
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!auth) {
+      setCurrentUserId(null);
+      setFavoriteFacilityIds(new Set());
+      return undefined;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const nextUserId = user?.uid ?? null;
+      setCurrentUserId(nextUserId);
+
+      if (!nextUserId) {
+        setFavoriteFacilityIds(new Set());
+        return;
+      }
+
+      void loadFavoriteFacilities(nextUserId);
+    });
+
+    return unsubscribe;
+  }, [loadFavoriteFacilities]);
 
   React.useEffect(() => {
     let isActive = true;
@@ -600,6 +640,15 @@ export default function Search({
     await runSearch(nextMode, activeSport || undefined, undefined, '');
   }, [runSearch, sportInput]);
 
+  const toggleFavoritesFilter = React.useCallback(() => {
+    if (!currentUserId) {
+      Alert.alert('Kirjaudu sisaan', 'Sinun tulee kirjautua sisaan ennen suosikkien tarkastelua.');
+      return;
+    }
+
+    setShowFavoritesOnly((current) => !current);
+  }, [currentUserId]);
+
   const applyDateFilter = React.useCallback((date: Date) => {
     const nextDateFilter = formatDateAsDbDate(date);
     setActiveDateFilter(nextDateFilter);
@@ -748,6 +797,24 @@ export default function Search({
     });
   }, [isSubmittingBooking, sectionBookings, todaySlots, styles]);
 
+  const filteredSections = React.useMemo(() => {
+    const visibleSections = sections
+      .filter((section) => matchesDateFilter(section, activeDateFilter))
+      .filter((section) => {
+        if (!showFavoritesOnly) {
+          return true;
+        }
+
+        const facilityKey = normalizeFacilityKey(section.facilityId);
+        return !!facilityKey && favoriteFacilityIds.has(facilityKey);
+      });
+
+    return [...visibleSections].sort((left, right) => {
+      const rightValue = favoriteFacilityIds.has(normalizeFacilityKey(right.facilityId)) ? 1 : 0;
+      const leftValue = favoriteFacilityIds.has(normalizeFacilityKey(left.facilityId)) ? 1 : 0;
+      return rightValue - leftValue;
+    });
+  }, [activeDateFilter, favoriteFacilityIds, sections, showFavoritesOnly]);
   const slotsTitle = React.useMemo(() => {
     const selectedDay = new Date(slotDate);
     selectedDay.setHours(0, 0, 0, 0);
@@ -812,6 +879,67 @@ export default function Search({
     (section: FacilitySection) =>
       facilityAddressById[normalizeFacilityKey(section.facilityId)] ?? null,
     [facilityAddressById]
+  );
+
+  const isFacilityFavorite = React.useCallback(
+    (section: FacilitySection) => {
+      const facilityKey = normalizeFacilityKey(section.facilityId);
+      return !!facilityKey && favoriteFacilityIds.has(facilityKey);
+    },
+    [favoriteFacilityIds]
+  );
+
+  const toggleFavoriteForSection = React.useCallback(
+    async (section: FacilitySection) => {
+      const facilityKey = normalizeFacilityKey(section.facilityId);
+
+      if (!facilityKey) {
+        setErrorMessage('Hallia ei voitu lisata suosikkeihin.');
+        return;
+      }
+
+      if (!currentUserId) {
+        setErrorMessage(null);
+        Alert.alert('Kirjaudu sisaan', 'Sinun tulee kirjautua sisaan ennen suosikkien lisaamista.');
+        return;
+      }
+
+      const wasFavorite = favoriteFacilityIds.has(facilityKey);
+      setIsSyncingFavoriteFacilityId(facilityKey);
+      setErrorMessage(null);
+
+      setFavoriteFacilityIds((previous) => {
+        const next = new Set(previous);
+        if (wasFavorite) {
+          next.delete(facilityKey);
+        } else {
+          next.add(facilityKey);
+        }
+        return next;
+      });
+
+      try {
+        if (wasFavorite) {
+          await removeFavoriteFacility(currentUserId, facilityKey);
+        } else {
+          await addFavoriteFacility(currentUserId, facilityKey);
+        }
+      } catch {
+        setFavoriteFacilityIds((previous) => {
+          const next = new Set(previous);
+          if (wasFavorite) {
+            next.add(facilityKey);
+          } else {
+            next.delete(facilityKey);
+          }
+          return next;
+        });
+        setErrorMessage('Suosikin paivitys epaonnistui. Yrita uudelleen.');
+      } finally {
+        setIsSyncingFavoriteFacilityId(null);
+      }
+    },
+    [currentUserId, favoriteFacilityIds]
   );
 
   const openInMaps = React.useCallback(async () => {
@@ -968,10 +1096,36 @@ export default function Search({
           children: getSportAndFieldLabel(section),
         })
       ),
-      React.createElement(Text, {
-        style: styles.chevron,
-        children: '>',
-      })
+      React.createElement(
+        View,
+        { style: styles.slotActions },
+        React.createElement(
+          Pressable,
+          {
+            style: [
+              styles.favoriteButton,
+              isSyncingFavoriteFacilityId === normalizeFacilityKey(section.facilityId)
+                ? styles.favoriteButtonDisabled
+                : null,
+            ],
+            onPress: (event) => {
+              event.stopPropagation();
+              void toggleFavoriteForSection(section);
+            },
+          },
+          React.createElement(Text, {
+            style: [
+              styles.favoriteButtonText,
+              isFacilityFavorite(section) ? styles.favoriteButtonTextActive : null,
+            ],
+            children: isFacilityFavorite(section) ? '★' : '☆',
+          })
+        ),
+        React.createElement(Text, {
+          style: styles.chevron,
+          children: '>',
+        })
+      )
     )
   );
 
@@ -1052,6 +1206,26 @@ export default function Search({
             children: activeDateFilter
               ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
               : 'Pvm',
+          }),
+          React.createElement(Chip, {
+            mode: 'flat',
+            compact: true,
+            showSelectedCheck: false,
+            style: styles.filterChip,
+            textStyle: styles.filterChipText,
+            selected: searchMode === 'status',
+            onPress: toggleBookingStatus,
+            children: bookedOnly ? 'Vapaat' : 'Varatut',
+          }),
+          React.createElement(Chip, {
+            mode: 'flat',
+            compact: true,
+            showSelectedCheck: false,
+            style: styles.filterChip,
+            textStyle: styles.filterChipText,
+            selected: showFavoritesOnly,
+            onPress: toggleFavoritesFilter,
+            children: showFavoritesOnly ? 'Suosikit ✓' : 'Suosikit',
           })
         ),
       ),
@@ -1303,10 +1477,41 @@ export default function Search({
                     style: styles.modalHall,
                     children: selectedSection ? getFacilityName(selectedSection) : '-',
                   }),
-                  React.createElement(Text, {
-                    style: styles.modalTime,
-                    children: selectedSection?.isBooked ? 'Varattu' : null,
-                  })
+                  React.createElement(
+                    View,
+                    { style: styles.modalTopActions },
+                    React.createElement(
+                      Pressable,
+                      {
+                        style: [
+                          styles.favoriteButton,
+                          selectedSection &&
+                          isSyncingFavoriteFacilityId === normalizeFacilityKey(selectedSection.facilityId)
+                            ? styles.favoriteButtonDisabled
+                            : null,
+                        ],
+                        onPress: () => {
+                          if (selectedSection) {
+                            void toggleFavoriteForSection(selectedSection);
+                          }
+                        },
+                      },
+                      React.createElement(Text, {
+                        style: [
+                          styles.favoriteButtonText,
+                          selectedSection && isFacilityFavorite(selectedSection)
+                            ? styles.favoriteButtonTextActive
+                            : null,
+                        ],
+                        children:
+                          selectedSection && isFacilityFavorite(selectedSection) ? '★' : '☆',
+                      })
+                    ),
+                    React.createElement(Text, {
+                      style: styles.modalTime,
+                      children: selectedSection?.isBooked ? 'Varattu' : null,
+                    })
+                  )
                 ),
                 React.createElement(Text, {
                   style: styles.modalSubLine,
@@ -1647,6 +1852,11 @@ const createStyles = (
       flexShrink: 1,
       paddingRight: 10,
     },
+    slotActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: metrics.scale(8, 6, 10),
+    },
     slotTitle: {
       fontSize: metrics.scale(19, 15, 24),
       fontWeight: '500',
@@ -1659,6 +1869,25 @@ const createStyles = (
       fontSize: metrics.scale(20, 16, 26),
       color: colors.outline,
       marginLeft: 8,
+    },
+    favoriteButton: {
+      width: metrics.scale(30, 28, 34),
+      height: metrics.scale(30, 28, 34),
+      borderRadius: metrics.scale(15, 14, 17),
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceVariant,
+    },
+    favoriteButtonDisabled: {
+      opacity: 0.6,
+    },
+    favoriteButtonText: {
+      fontSize: metrics.scale(18, 16, 22),
+      color: colors.onSurfaceVariant,
+      marginTop: -1,
+    },
+    favoriteButtonTextActive: {
+      color: '#d97706',
     },
     modalBackdrop: {
       flex: 1,
@@ -1745,6 +1974,11 @@ const createStyles = (
       justifyContent: 'space-between',
       alignItems: 'flex-start',
       gap: 8,
+    },
+    modalTopActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: metrics.scale(8, 6, 10),
     },
     modalHall: {
       color: colors.onSurface,

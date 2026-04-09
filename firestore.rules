@@ -7,6 +7,10 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    match /users/{userId}/favorite_facilities/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     match /facilities/{docId} {
       allow read: if true;
       allow write: if request.auth != null;
