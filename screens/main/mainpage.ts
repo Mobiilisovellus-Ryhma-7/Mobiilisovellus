@@ -1,12 +1,11 @@
 import React from 'react';
 import {
   Image,
-  Pressable,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Button, Text, useTheme } from 'react-native-paper';
+import { Button, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
@@ -27,7 +26,7 @@ export default function MainPage({
   const { colors, dark } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
-  const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
+  const styles = React.useMemo(() => createStyles(metrics, colors, dark), [colors, dark, metrics]);
   const [isSignedIn, setIsSignedIn] = React.useState(false);
 
   React.useEffect(() => {
@@ -50,8 +49,8 @@ export default function MainPage({
       View,
       { style: [styles.screen, { backgroundColor: colors.background }] },
       React.createElement(
-        View,
-        { style: styles.topSection },
+        Surface,
+        { style: styles.topSection, elevation: 2 },
         React.createElement(Image, {
           source: getDynamicSportHallLogoSource(dark),
           style: styles.logo,
@@ -61,6 +60,10 @@ export default function MainPage({
           style: [styles.title, { color: colors.onSurface }],
           variant: 'displaySmall',
           children: 'HALLILLE!',
+        }),
+        React.createElement(Text, {
+          style: [styles.subtitle, { color: colors.onSurfaceVariant }],
+          children: 'Varaa vuorot helposti ja nopeasti.',
         }),
         React.createElement(
           View,
@@ -75,31 +78,38 @@ export default function MainPage({
           }),
           !isSignedIn
             ? React.createElement(Button, {
-                mode: 'contained',
+                mode: 'contained-tonal',
                 onPress: onOpenLogin,
-                style: styles.primaryButton,
+                style: styles.secondaryButton,
                 contentStyle: styles.buttonContent,
-                labelStyle: styles.buttonText,
+                labelStyle: styles.secondaryButtonText,
                 children: 'Kirjaudu',
               })
-            : React.createElement(Text, {
-                style: styles.signedInText,
-                children: 'Olet kirjautunut sisään',
-              })
+            : React.createElement(
+                Surface,
+                { style: styles.signedInBadge, elevation: 0 },
+                React.createElement(Text, {
+                  style: styles.signedInText,
+                  children: 'Olet kirjautunut sisään',
+                })
+              )
         )
       ),
       React.createElement(
-        View,
-        { style: styles.bottomNav },
-        React.createElement(
-          Pressable,
-          {
-            style: styles.navItem,
-            onPress: onOpenProfile,
-          },
-          React.createElement(View, { style: styles.profileHead }),
-          React.createElement(View, { style: styles.profileBody })
-        )
+        Surface,
+        { style: styles.bottomNav, elevation: 1 },
+        React.createElement(IconButton, {
+          mode: 'contained-tonal',
+          icon: 'account',
+          onPress: onOpenProfile,
+          size: metrics.scale(24, 20, 28),
+          style: styles.profileButton,
+          accessibilityLabel: 'Avaa profiili',
+        }),
+        React.createElement(Text, {
+          style: [styles.profileLabel, { color: colors.onSurfaceVariant }],
+          children: 'Profiili',
+        })
       )
     )
   );
@@ -107,7 +117,8 @@ export default function MainPage({
 
 const createStyles = (
   metrics: ReturnType<typeof getResponsiveMetrics>,
-  colors: any
+  colors: any,
+  dark: boolean
 ) =>
   StyleSheet.create({
     safeArea: {
@@ -127,10 +138,12 @@ const createStyles = (
       width: '100%',
       maxWidth: metrics.contentMaxWidth,
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: metrics.scale(24, 18, 30),
+      backgroundColor: dark ? '#1e293b' : colors.surface,
+      borderRadius: metrics.scale(28, 20, 34),
       paddingHorizontal: metrics.scale(20, 14, 28),
       paddingVertical: metrics.scale(20, 14, 30),
+      borderWidth: 1,
+      borderColor: dark ? '#334155' : colors.outline,
     },
     logo: {
       width: metrics.scale(132, 100, 150),
@@ -138,75 +151,80 @@ const createStyles = (
       marginTop: metrics.scale(8, 4, 12),
     },
     title: {
-      marginTop: metrics.scale(10, 8, 14),
+      marginTop: metrics.scale(8, 6, 12),
       fontSize: metrics.scale(30, 24, 36),
       letterSpacing: 0.6,
       fontStyle: 'italic',
       color: colors.onSurface,
       textAlign: 'center',
     },
+    subtitle: {
+      marginTop: metrics.scale(8, 6, 10),
+      fontSize: metrics.scale(14, 12, 18),
+      lineHeight: metrics.scale(20, 18, 24),
+      textAlign: 'center',
+      maxWidth: metrics.scale(320, 260, 420),
+    },
     buttonsWrap: {
-      marginTop: metrics.scale(34, 20, 44),
+      marginTop: metrics.scale(28, 18, 36),
       width: '100%',
       alignItems: 'center',
-      gap: metrics.scale(16, 12, 22),
+      gap: metrics.scale(12, 10, 16),
     },
     primaryButton: {
       width: '100%',
-      maxWidth: 320,
+      maxWidth: 340,
+      borderRadius: metrics.scale(16, 14, 22),
+    },
+    secondaryButton: {
+      width: '100%',
+      maxWidth: 340,
       borderRadius: metrics.scale(16, 14, 22),
     },
     buttonContent: {
-      height: metrics.scale(62, 50, 70),
+      height: metrics.scale(58, 48, 66),
     },
     buttonText: {
       color: '#ffffff',
       fontSize: metrics.scale(18, 15, 22),
-      fontWeight: '600',
+      fontWeight: '700',
+    },
+    secondaryButtonText: {
+      fontSize: metrics.scale(18, 15, 22),
+      fontWeight: '700',
+    },
+    signedInBadge: {
+      marginTop: metrics.scale(2, 0, 4),
+      borderRadius: metrics.scale(14, 12, 18),
+      backgroundColor: colors.surfaceVariant,
+      paddingHorizontal: metrics.scale(14, 12, 18),
+      paddingVertical: metrics.scale(10, 8, 12),
     },
     signedInText: {
+      fontSize: metrics.scale(14, 12, 17),
+      fontWeight: '700',
       color: colors.onSurfaceVariant,
-      fontSize: metrics.scale(15, 13, 18),
-      fontWeight: '600',
-      marginTop: metrics.scale(4, 2, 6),
     },
     bottomNav: {
-      width: 'auto',
+      width: '100%',
       maxWidth: metrics.contentMaxWidth,
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
+      gap: metrics.scale(8, 6, 10),
       alignSelf: 'center',
+      paddingVertical: metrics.scale(8, 6, 10),
+      borderRadius: metrics.scale(18, 14, 22),
+      backgroundColor: dark ? '#1e293b' : colors.surface,
+      borderWidth: 1,
+      borderColor: dark ? '#334155' : colors.outline,
     },
-    navItem: {
-      width: metrics.scale(46, 40, 58),
-      height: metrics.scale(46, 40, 58),
-      borderRadius: metrics.scale(23, 20, 29),
-      backgroundColor: colors.surfaceVariant,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 0,
+    profileButton: {
+      margin: 0,
     },
-    navInnerSquare: {
-      width: metrics.scale(15, 12, 20),
-      height: metrics.scale(15, 12, 20),
-      borderRadius: 4,
-      borderWidth: 2,
-      borderColor: '#414141',
-      backgroundColor: '#f5f5f5',
-    },
-    profileHead: {
-      width: metrics.scale(12, 10, 16),
-      height: metrics.scale(12, 10, 16),
-      borderRadius: metrics.scale(6, 5, 8),
-      backgroundColor: colors.onSurface,
-      marginBottom: 2,
-    },
-    profileBody: {
-      width: metrics.scale(18, 14, 24),
-      height: metrics.scale(10, 8, 14),
-      borderTopLeftRadius: metrics.scale(9, 7, 12),
-      borderTopRightRadius: metrics.scale(9, 7, 12),
-      backgroundColor: colors.onSurface,
+    profileLabel: {
+      fontSize: metrics.scale(14, 12, 16),
+      fontWeight: '700',
+      marginRight: metrics.scale(8, 6, 10),
     },
   });

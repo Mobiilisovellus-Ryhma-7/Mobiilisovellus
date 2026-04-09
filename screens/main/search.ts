@@ -1157,7 +1157,7 @@ export default function Search({
         ),
         React.createElement(Text, {
           style: styles.chevron,
-          children: '>',
+          children: '›',
         })
       )
     )
@@ -1189,7 +1189,7 @@ export default function Search({
           React.createElement(
             Pressable,
             { style: styles.backButton, onPress: onBack },
-            React.createElement(Text, { style: styles.backIcon, children: '<' })
+            React.createElement(Text, { style: styles.backIcon, children: '‹' })
           ),
           React.createElement(View, { style: styles.headerSpacer })
         ),

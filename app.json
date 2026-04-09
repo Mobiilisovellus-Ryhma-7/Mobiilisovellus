@@ -51,6 +51,12 @@
             }
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Sovellus tarvitsee paasyo kuviin profiilikuvan valintaa varten."
+        }
       ]
     ]
   }
