@@ -700,8 +700,6 @@ export default function Profile({
 							labelStyle: styles.actionButtonLabel,
 							children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
 						}),
-							children: 'Varaushistoria',
-						}),
 						React.createElement(Button, {
 							mode: 'elevated',
 							onPress: openStatisticsModal,
