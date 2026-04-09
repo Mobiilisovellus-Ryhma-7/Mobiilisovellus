@@ -11,11 +11,14 @@ import {
 	View,
 	useWindowDimensions,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Button, Text, TextInput, useTheme } from 'react-native-paper';
+import { useFocusEffect } from '@react-navigation/native';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
-import { auth } from '../../services/firebase';
+import { auth, db } from '../../services/firebase';
 import {
 	changeCurrentUserPassword,
 	deleteCurrentUserAccount,
@@ -56,7 +59,7 @@ export default function Profile({
 
 		return trimmedEmail.charAt(0).toUpperCase();
 	}, [userEmail]);
-	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
+	const styles = React.useMemo(() => createStyles(metrics, colors, dark), [colors, dark, metrics]);
 	const [isSigningOut, setIsSigningOut] = React.useState(false);
 	const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -78,6 +81,83 @@ export default function Profile({
 	const [userBookings, setUserBookings] = React.useState<Booking[]>([]);
 	const [facilitySectionsById, setFacilitySectionsById] = React.useState<Record<string, FacilitySection>>({});
 	const [currentTimestamp, setCurrentTimestamp] = React.useState(() => Date.now());
+	const [profilePhotoUri, setProfilePhotoUri] = React.useState<string | null>(null);
+	const [isPickingPhoto, setIsPickingPhoto] = React.useState(false);
+
+	React.useEffect(() => {
+		const userId = auth?.currentUser?.uid;
+		if (!userId || !db) {
+			setProfilePhotoUri(null);
+			return;
+		}
+
+		let isActive = true;
+
+		getDoc(doc(db, 'users', userId))
+			.then((snapshot) => {
+				if (!isActive || !snapshot.exists()) {
+					return;
+				}
+
+				const data = snapshot.data() as { profilePhotoUri?: unknown };
+				if (typeof data.profilePhotoUri === 'string' && data.profilePhotoUri.trim()) {
+					setProfilePhotoUri(data.profilePhotoUri.trim());
+				}
+			})
+			.catch(() => {
+				if (isActive) {
+					setProfilePhotoUri(null);
+				}
+			});
+
+		return () => {
+			isActive = false;
+		};
+	}, []);
+
+	const pickProfilePhoto = React.useCallback(async () => {
+		const userId = auth?.currentUser?.uid;
+		if (!userId || !db) {
+			Alert.alert('Kirjaudu sisaan', 'Kirjaudu sisaan ennen profiilikuvan vaihtamista.');
+			return;
+		}
+
+		setIsPickingPhoto(true);
+
+		try {
+			const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+			if (!permission.granted) {
+				Alert.alert('Lupa puuttuu', 'Salli kuvakirjaston käyttö, jotta voit valita profiilikuvan.');
+				return;
+			}
+
+			const result = await ImagePicker.launchImageLibraryAsync({
+				mediaTypes: ImagePicker.MediaTypeOptions.Images,
+				allowsEditing: true,
+				aspect: [1, 1],
+				quality: 0.7,
+			});
+
+			if (result.canceled || !result.assets[0]?.uri) {
+				return;
+			}
+
+			const nextPhotoUri = result.assets[0].uri;
+			setProfilePhotoUri(nextPhotoUri);
+
+			await setDoc(
+				doc(db, 'users', userId),
+				{
+					profilePhotoUri: nextPhotoUri,
+				},
+				{ merge: true }
+			);
+		} catch {
+			Alert.alert('Virhe', 'Profiilikuvan valinta epaonnistui. Yrita uudelleen.');
+		} finally {
+			setIsPickingPhoto(false);
+		}
+	}, []);
 
 	const openPasswordModal = React.useCallback(() => {
 		setPasswordError(null);
@@ -143,6 +223,12 @@ export default function Profile({
 		setShowBookingsModal(true);
 		await loadUserBookings();
 	}, [loadUserBookings]);
+
+	useFocusEffect(
+		React.useCallback(() => {
+			void loadUserBookings();
+		}, [loadUserBookings])
+	);
 
 	const closeBookingsModal = React.useCallback(() => {
 		if (isLoadingBookings) {
@@ -373,11 +459,28 @@ export default function Profile({
 						View,
 						{ style: styles.heroRow },
 						React.createElement(
-							View,
-							{ style: [styles.heroAvatar, { backgroundColor: colors.primary }] },
+							Pressable,
+							{
+								style: styles.heroAvatarPressable,
+								onPress: () => void pickProfilePhoto(),
+								disabled: isPickingPhoto,
+							},
+							React.createElement(
+								View,
+								{ style: [styles.heroAvatar, { backgroundColor: colors.primary }] },
+								profilePhotoUri
+									? React.createElement(Image, {
+										source: { uri: profilePhotoUri },
+										style: styles.heroAvatarImage,
+									})
+									: React.createElement(Text, {
+										style: [styles.heroAvatarText, { color: colors.onPrimary }],
+										children: userInitial,
+									})
+							),
 							React.createElement(Text, {
-								style: [styles.heroAvatarText, { color: colors.onPrimary }],
-								children: userInitial,
+								style: [styles.heroAvatarHint, { color: colors.primary }],
+								children: isPickingPhoto ? 'Ladataan...' : 'Vaihda kuva',
 							})
 						),
 						React.createElement(
@@ -393,7 +496,7 @@ export default function Profile({
 							}),
 							React.createElement(Text, {
 								style: [styles.heroSubtext, { color: colors.onSurfaceVariant }],
-								children: 'Hallitse salasanaa, varauksia ja sovelluksen ulkoasua.',
+								children: 'Hallitse varauksia, tiliä ja sovelluksen ulkoasua.',
 							})
 						)
 					)
@@ -422,7 +525,10 @@ export default function Profile({
 						}),
 						React.createElement(Text, {
 							style: [styles.statLabel, { color: colors.onSurfaceVariant }],
-							children: 'Historiassa',
+							numberOfLines: 1,
+							adjustsFontSizeToFit: true,
+							minimumFontScale: 0.82,
+							children: 'Varaushistoria',
 						})
 					),
 					React.createElement(
@@ -443,27 +549,11 @@ export default function Profile({
 					{ style: styles.sectionCard },
 					React.createElement(Text, {
 						style: [styles.sectionTitle, { color: colors.onSurface }],
-						children: 'Asetukset',
+						children: 'Oma tili',
 					}),
 					React.createElement(
 						View,
 						{ style: styles.actionStack },
-						React.createElement(Button, {
-							mode: 'elevated',
-							onPress: openPasswordModal,
-							style: styles.actionButton,
-							contentStyle: styles.actionButtonContent,
-							labelStyle: styles.actionButtonLabel,
-							children: 'Vaihda salasanasi',
-						}),
-						React.createElement(Button, {
-							mode: 'contained-tonal',
-							onPress: onToggleDarkMode,
-							style: styles.actionButton,
-							contentStyle: styles.actionButtonContent,
-							labelStyle: styles.actionButtonLabel,
-							children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
-						}),
 						React.createElement(Button, {
 							mode: 'elevated',
 							onPress: openBookingsModal,
@@ -479,7 +569,15 @@ export default function Profile({
 							contentStyle: styles.actionButtonContent,
 							labelStyle: styles.actionButtonLabel,
 							children: 'Varaushistoria',
-						})
+						}),
+						React.createElement(Button, {
+							mode: 'contained-tonal',
+							onPress: onToggleDarkMode,
+							style: styles.actionButton,
+							contentStyle: styles.actionButtonContent,
+							labelStyle: styles.actionButtonLabel,
+							children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
+						}),
 					)
 				),
 				React.createElement(
@@ -488,6 +586,14 @@ export default function Profile({
 					React.createElement(Text, {
 						style: [styles.sectionTitle, { color: colors.onSurface }],
 						children: 'Tilin hallinta',
+					}),
+					React.createElement(Button, {
+						mode: 'elevated',
+						onPress: openPasswordModal,
+						style: styles.actionButton,
+						contentStyle: styles.actionButtonContent,
+						labelStyle: styles.actionButtonLabel,
+						children: 'Vaihda salasanasi',
 					}),
 					React.createElement(Button, {
 						mode: 'outlined',
@@ -871,7 +977,8 @@ export default function Profile({
 
 const createStyles = (
 	metrics: ReturnType<typeof getResponsiveMetrics>,
-	colors: any
+	colors: any,
+	dark: boolean
 ) =>
 	StyleSheet.create({
 		safeArea: {
@@ -937,12 +1044,18 @@ const createStyles = (
 			borderRadius: metrics.scale(24, 18, 30),
 			paddingHorizontal: metrics.scale(16, 12, 20),
 			paddingVertical: metrics.scale(16, 12, 20),
-			backgroundColor: colors.surface,
+			backgroundColor: dark ? '#1e293b' : colors.surface,
+			borderWidth: 1,
+			borderColor: dark ? '#334155' : colors.outline,
 		},
 		heroRow: {
 			flexDirection: 'row',
 			alignItems: 'center',
 			gap: metrics.scale(14, 10, 18),
+		},
+		heroAvatarPressable: {
+			alignItems: 'center',
+			gap: metrics.scale(6, 4, 8),
 		},
 		heroAvatar: {
 			width: metrics.scale(60, 52, 72),
@@ -951,6 +1064,15 @@ const createStyles = (
 			alignItems: 'center',
 			justifyContent: 'center',
 			elevation: 0,
+			overflow: 'hidden',
+		},
+		heroAvatarImage: {
+			width: '100%',
+			height: '100%',
+		},
+		heroAvatarHint: {
+			fontSize: metrics.scale(11, 10, 13),
+			fontWeight: '700',
 		},
 		heroAvatarText: {
 			fontSize: metrics.scale(22, 18, 28),
@@ -985,29 +1107,38 @@ const createStyles = (
 			borderRadius: metrics.scale(18, 14, 24),
 			paddingHorizontal: metrics.scale(12, 10, 16),
 			paddingVertical: metrics.scale(12, 10, 16),
-			backgroundColor: colors.surfaceVariant,
+			backgroundColor: dark ? '#273449' : colors.surfaceVariant,
+			borderWidth: 1,
+			borderColor: dark ? '#3f4f66' : colors.outline,
+			justifyContent: 'space-between',
 		},
 		statValue: {
 			fontSize: metrics.scale(20, 17, 24),
 			fontWeight: '800',
 		},
 		statLabel: {
-			marginTop: metrics.scale(4, 2, 6),
+			marginTop: metrics.scale(6, 4, 8),
 			fontSize: metrics.scale(12, 10, 14),
 			fontWeight: '600',
+			minHeight: metrics.scale(30, 24, 36),
+			textAlignVertical: 'top',
 		},
 		sectionCard: {
 			borderRadius: metrics.scale(24, 18, 30),
 			paddingHorizontal: metrics.scale(16, 12, 20),
 			paddingVertical: metrics.scale(16, 12, 20),
-			backgroundColor: colors.surface,
+			backgroundColor: dark ? '#1e293b' : colors.surface,
+			borderWidth: 1,
+			borderColor: dark ? '#334155' : colors.outline,
 			gap: metrics.scale(12, 10, 16),
 		},
 		sectionCardDanger: {
 			borderRadius: metrics.scale(24, 18, 30),
 			paddingHorizontal: metrics.scale(16, 12, 20),
 			paddingVertical: metrics.scale(16, 12, 20),
-			backgroundColor: colors.surface,
+			backgroundColor: dark ? '#1e293b' : colors.surface,
+			borderWidth: 1,
+			borderColor: dark ? '#334155' : colors.outline,
 			gap: metrics.scale(12, 10, 16),
 		},
 		sectionTitle: {
