@@ -79,6 +79,13 @@ function formatDateAsDbDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function formatDateAsDisplayDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${day}.${month}.${year}`;
+}
+
 function timeToHour(value: string | null | undefined): number | null {
   if (!value) {
     return null;
@@ -113,6 +120,20 @@ function matchesDateFilter(section: FacilitySection, dateFilter: string | null):
   }
 
   return formatDateAsDbDate(parsedDate) === dateFilter;
+}
+
+function parseDateKeyToDate(dateKey: string) {
+  const match = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date = new Date(year, month, day);
+
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function normalizeFacilityKey(value: unknown): string {
@@ -196,25 +217,40 @@ export default function Search({
   const [pendingBookingSlot, setPendingBookingSlot] = React.useState<TimeSlot | null>(null);
   const hasBootstrappedList = React.useRef(false);
   const hasAppliedInitialFilters = React.useRef(false);
-  const bookingDate = React.useMemo(() => formatDateKey(new Date()), []);
+  const bookingDate = React.useMemo(
+    () => activeDateFilter ?? formatDateKey(new Date()),
+    [activeDateFilter]
+  );
+  const slotDate = React.useMemo(() => {
+    if (activeDateFilter) {
+      const parsed = parseDateKeyToDate(activeDateFilter);
+      if (parsed) {
+        return parsed;
+      }
+    }
+
+    return new Date();
+  }, [activeDateFilter]);
   const todaySlots = React.useMemo(() => {
     const startHour = timeToHour(selectedSection?.openingStart);
     const endHour = timeToHour(selectedSection?.openingEnd);
 
-    return buildDailyTimeSlots(new Date(), {
+    return buildDailyTimeSlots(slotDate, {
       startHour: startHour ?? 8,
       endHour: endHour ?? 22,
     });
-  }, [selectedSection?.openingEnd, selectedSection?.openingStart]);
+  }, [selectedSection?.openingEnd, selectedSection?.openingStart, slotDate]);
 
   const runSearch = React.useCallback(
     async (
       modeOverride?: SearchMode,
       sportOverride?: string,
       bookedOverride?: boolean,
-      nameOverride?: string
+      nameOverride?: string,
+      dateFilterOverride?: string | null
     ) => {
       const mode = modeOverride ?? searchMode;
+      const dateFilter = dateFilterOverride ?? activeDateFilter;
       setErrorMessage(null);
       setIsLoading(true);
 
@@ -277,6 +313,76 @@ export default function Search({
           nextSections = await listFacilitySections();
         }
 
+        if (mode === 'sport') {
+          const activePlace = (nameOverride ?? nameInput).trim();
+
+          if (activePlace) {
+            if (!db) {
+              throw new Error('Tietokantayhteys puuttuu.');
+            }
+
+            const facilitiesSnapshot = await getDocs(collection(db, 'facilities'));
+            const normalizedPlaceValue = activePlace.toLowerCase();
+            const matchingFacilityIds = new Set(
+              facilitiesSnapshot.docs
+                .filter((doc) => {
+                  const data = doc.data() as { name?: unknown };
+                  const facilityName = typeof data.name === 'string' ? data.name.trim().toLowerCase() : '';
+                  return facilityName.includes(normalizedPlaceValue);
+                })
+                .flatMap((doc) => {
+                  const data = doc.data() as { id?: unknown };
+                  const keys = [normalizeFacilityKey(doc.id), normalizeFacilityKey(data.id)];
+                  return keys.filter((key) => !!key);
+                })
+            );
+
+            nextSections = nextSections.filter(
+              (section) => matchingFacilityIds.has(normalizeFacilityKey(section.facilityId))
+            );
+          }
+        }
+
+        if (mode === 'name') {
+          const activeSport = (sportOverride ?? sportInput).trim();
+
+          if (activeSport) {
+            const normalizedSport = activeSport.toLowerCase();
+            nextSections = nextSections.filter(
+              (section) => (section.sport ?? '').trim().toLowerCase() === normalizedSport
+            );
+          }
+        }
+
+        if (dateFilter) {
+          const targetDate = parseDateKeyToDate(dateFilter);
+          if (!targetDate) {
+            throw new Error('Virheellinen paivamaara.');
+          }
+
+          const sectionAvailability = await Promise.all(
+            nextSections.map(async (section) => {
+              const bookings = await getBookingsForSectionOnDate(section.id, dateFilter, ['confirmed']);
+              const bookedSlots = new Set(
+                bookings
+                  .filter((booking) => booking.slotStart && booking.slotEnd)
+                  .map((booking) => `${booking.slotStart}-${booking.slotEnd}`)
+              );
+
+              const startHour = timeToHour(section.openingStart) ?? 8;
+              const endHour = timeToHour(section.openingEnd) ?? 22;
+              const daySlots = buildDailyTimeSlots(targetDate, { startHour, endHour });
+
+              const hasFreeSlot = daySlots.some((slot) => !slot.isPast && !bookedSlots.has(slot.key));
+              return { section, hasFreeSlot };
+            })
+          );
+
+          nextSections = sectionAvailability
+            .filter((item) => item.hasFreeSlot)
+            .map((item) => item.section);
+        }
+
         setSections(nextSections);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Haku epaonnistui. Yrita uudelleen.';
@@ -286,7 +392,7 @@ export default function Search({
         setIsLoading(false);
       }
     },
-    [bookedOnly, nameInput, searchMode, sportInput]
+    [activeDateFilter, bookedOnly, nameInput, searchMode, sportInput]
   );
 
   React.useEffect(() => {
@@ -455,12 +561,22 @@ export default function Search({
       setSportInput(value);
       setSearchMode('sport');
       setErrorMessage(null);
-      setActiveDateFilter(null);
       setIsSportPickerOpen(false);
       await runSearch('sport', value);
     },
     [runSearch]
   );
+
+  const clearSportFilter = React.useCallback(async () => {
+    const activePlace = nameInput.trim();
+    const nextMode: SearchMode = activePlace ? 'name' : 'all';
+
+    setSportInput('');
+    setSearchMode(nextMode);
+    setErrorMessage(null);
+    setIsSportPickerOpen(false);
+    await runSearch(nextMode, '', undefined, activePlace || undefined);
+  }, [nameInput, runSearch]);
 
   const selectPlace = React.useCallback(
     async (value: string) => {
@@ -473,16 +589,21 @@ export default function Search({
     [runSearch]
   );
 
-  const toggleBookingStatus = React.useCallback(async () => {
-    const nextBookedValue = !bookedOnly;
-    setBookedOnly(nextBookedValue);
-    setSearchMode('status');
-    setActiveDateFilter(null);
-    await runSearch('status', undefined, nextBookedValue);
-  }, [bookedOnly, runSearch]);
+  const clearPlaceFilter = React.useCallback(async () => {
+    const activeSport = sportInput.trim();
+    const nextMode: SearchMode = activeSport ? 'sport' : 'all';
+
+    setNameInput('');
+    setSearchMode(nextMode);
+    setErrorMessage(null);
+    setIsPlacePickerOpen(false);
+    await runSearch(nextMode, activeSport || undefined, undefined, '');
+  }, [runSearch, sportInput]);
 
   const applyDateFilter = React.useCallback((date: Date) => {
-    setActiveDateFilter(formatDateAsDbDate(date));
+    const nextDateFilter = formatDateAsDbDate(date);
+    setActiveDateFilter(nextDateFilter);
+    return nextDateFilter;
   }, []);
 
   const loadSelectedSectionBookings = React.useCallback(async (sectionId: string) => {
@@ -619,6 +740,7 @@ export default function Search({
           style: [
             styles.slotBookingStatus,
             isBooked ? styles.slotBookingStatusBooked : null,
+            !isBooked && slot.isPast ? styles.slotBookingStatusPast : null,
           ],
           children: statusLabel,
         })
@@ -626,10 +748,32 @@ export default function Search({
     });
   }, [isSubmittingBooking, sectionBookings, todaySlots, styles]);
 
-  const filteredSections = React.useMemo(
-    () => sections.filter((section) => matchesDateFilter(section, activeDateFilter)),
-    [activeDateFilter, sections]
-  );
+  const slotsTitle = React.useMemo(() => {
+    const selectedDay = new Date(slotDate);
+    selectedDay.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const oneDayInMs = 24 * 60 * 60 * 1000;
+    const dayDiff = Math.round((selectedDay.getTime() - today.getTime()) / oneDayInMs);
+
+    if (dayDiff === 0) {
+      return 'Vuorot tänään';
+    }
+
+    if (dayDiff === 1) {
+      return 'Vuorot huomenna';
+    }
+
+    if (dayDiff === 2) {
+      return 'Vuorot ylihuomenna';
+    }
+
+    return `Vuorot ${formatDateAsDisplayDate(selectedDay)}`;
+  }, [slotDate]);
+
+  const filteredSections = React.useMemo(() => sections, [sections]);
 
   const placeOptions = React.useMemo(
     () =>
@@ -908,16 +1052,6 @@ export default function Search({
             children: activeDateFilter
               ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
               : 'Pvm',
-          }),
-          React.createElement(Chip, {
-            mode: 'flat',
-            compact: true,
-            showSelectedCheck: false,
-            style: styles.filterChip,
-            textStyle: styles.filterChipText,
-            selected: searchMode === 'status',
-            onPress: toggleBookingStatus,
-            children: bookedOnly ? 'Vapaat' : 'Varatut',
           })
         ),
       ),
@@ -1010,6 +1144,11 @@ export default function Search({
               { style: styles.modalPickerActions },
               React.createElement(Button, {
                 mode: 'text',
+                onPress: () => void clearSportFilter(),
+                children: 'Kaikki',
+              }),
+              React.createElement(Button, {
+                mode: 'text',
                 onPress: () => setIsSportPickerOpen(false),
                 children: 'Sulje',
               })
@@ -1078,6 +1217,11 @@ export default function Search({
               { style: styles.modalPickerActions },
               React.createElement(Button, {
                 mode: 'text',
+                onPress: () => void clearPlaceFilter(),
+                children: 'Kaikki',
+              }),
+              React.createElement(Button, {
+                mode: 'text',
                 onPress: () => setIsPlacePickerOpen(false),
                 children: 'Sulje',
               })
@@ -1120,9 +1264,10 @@ export default function Search({
                   setIsDatePickerVisible(false);
                   return;
                 }
+
                 setSelectedDate(date);
-                applyDateFilter(date);
-                void runSearch();
+                const nextDateFilter = applyDateFilter(date);
+                void runSearch(undefined, undefined, undefined, undefined, nextDateFilter);
                 setIsDatePickerVisible(false);
               },
             }),
@@ -1240,7 +1385,7 @@ export default function Search({
                   { style: styles.slotsContainer },
                   React.createElement(Text, {
                     style: styles.slotsTitle,
-                    children: 'Aikavälit tänään',
+                    children: slotsTitle,
                   }),
                   isLoadingSlots
                     ? React.createElement(ActivityIndicator, {
@@ -1391,7 +1536,8 @@ const createStyles = (
       gap: metrics.scale(5, 4, 8),
     },
     filterChip: {
-      minWidth: metrics.scale(76, 64, 104),
+      flex: 1,
+      minWidth: metrics.scale(64, 56, 88),
       minHeight: metrics.scale(34, 30, 40),
       justifyContent: 'center',
       backgroundColor: colors.surfaceVariant,
@@ -1681,6 +1827,9 @@ const createStyles = (
     },
     slotBookingStatusBooked: {
       color: '#991b1b',
+    },
+    slotBookingStatusPast: {
+      color: '#ca8a04',
     },
     closeBookingModalButton: {
       marginTop: metrics.scale(10, 8, 14),
