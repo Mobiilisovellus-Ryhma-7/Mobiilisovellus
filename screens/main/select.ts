@@ -10,7 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ActivityIndicator, Button, Switch, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, Text, useTheme } from 'react-native-paper';
 import { collection, getDocs } from 'firebase/firestore';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
@@ -18,7 +18,6 @@ import Screen from '../shared/Screen';
 import {
   db,
   listFacilitySections,
-  searchFacilitySectionsByBookingStatus,
   searchFacilitySectionsByName,
   searchFacilitySectionsBySport,
 } from '../../services/firebase';
@@ -28,7 +27,7 @@ type SelectProps = {
   onSearch?: (params?: { mode?: SearchMode; sport?: string; name?: string; booked?: boolean }) => void;
 };
 
-type SearchMode = 'all' | 'sport' | 'name' | 'status';
+type SearchMode = 'all' | 'sport' | 'name';
 
 type SportOption = {
   label: string;
@@ -40,13 +39,12 @@ type NameOption = {
   value: string;
 };
 
-const SEARCH_MODES: SearchMode[] = ['all', 'sport', 'name', 'status'];
+const SEARCH_MODES: SearchMode[] = ['all', 'sport', 'name'];
 
 const MODE_LABELS: Record<SearchMode, string> = {
   all: 'Kaikki',
   sport: 'Laji',
   name: 'Paikka',
-  status: 'Varaustila',
 };
 
 export default function Select({ onBack, onSearch }: SelectProps) {
@@ -63,7 +61,6 @@ export default function Select({ onBack, onSearch }: SelectProps) {
   const [sportOptions, setSportOptions] = React.useState<SportOption[]>([]);
   const [nameOptions, setNameOptions] = React.useState<NameOption[]>([]);
   const [name, setName] = React.useState('');
-  const [bookedOnly, setBookedOnly] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [resultCount, setResultCount] = React.useState<number | null>(null);
@@ -173,10 +170,6 @@ export default function Select({ onBack, onSearch }: SelectProps) {
         );
         setResultCount(sections.length);
         onSearch?.({ mode, name: nameValue });
-      } else if (mode === 'status') {
-        sections = await searchFacilitySectionsByBookingStatus(bookedOnly);
-        setResultCount(sections.length);
-        onSearch?.({ mode, booked: bookedOnly });
       } else {
         sections = await listFacilitySections();
         setResultCount(sections.length);
@@ -188,7 +181,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [bookedOnly, name, onSearch, searchMode, sport]);
+  }, [name, onSearch, searchMode, sport]);
 
   const openSportPicker = React.useCallback(() => {
     setSearchMode('sport');
@@ -319,20 +312,6 @@ export default function Select({ onBack, onSearch }: SelectProps) {
               React.createElement(Text, {
                 style: styles.sportPickerHint,
                 children: 'Avaa paikka-valikko',
-              })
-            )
-          : null,
-        searchMode === 'status'
-          ? React.createElement(
-              View,
-              { style: styles.statusRow },
-              React.createElement(Text, {
-                style: styles.statusLabel,
-                children: 'Näytä vain varatut kentät',
-              }),
-              React.createElement(Switch, {
-                value: bookedOnly,
-                onValueChange: setBookedOnly,
               })
             )
           : null,
@@ -624,16 +603,20 @@ const createStyles = (
     },
     modeRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexWrap: 'nowrap',
       gap: metrics.scale(8, 6, 10),
+      width: '100%',
     },
     modeButton: {
+      flex: 1,
       paddingHorizontal: metrics.scale(12, 10, 16),
       paddingVertical: metrics.scale(8, 6, 12),
       borderRadius: metrics.scale(12, 10, 14),
       borderWidth: 1,
       borderColor: colors.outline,
       backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     modeButtonActive: {
       backgroundColor: '#dbeafe',
@@ -643,6 +626,7 @@ const createStyles = (
       fontSize: metrics.scale(14, 12, 18),
       color: colors.onSurface,
       fontWeight: '500',
+      textAlign: 'center',
     },
     modeButtonTextActive: {
       color: '#1d4ed8',
