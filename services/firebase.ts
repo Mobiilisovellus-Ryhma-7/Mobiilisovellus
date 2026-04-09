@@ -11,6 +11,7 @@ import {
   limit,
   query,
   serverTimestamp,
+  setDoc,
   where,
 } from 'firebase/firestore';
 
@@ -106,6 +107,7 @@ const FACILITY_SECTIONS_COLLECTION =
   process.env.EXPO_PUBLIC_FIRESTORE_FACILITY_SECTIONS_COLLECTION || 'facility_sections';
 const FACILITIES_COLLECTION = process.env.EXPO_PUBLIC_FIRESTORE_FACILITIES_COLLECTION || 'facilities';
 const BOOKINGS_COLLECTION = process.env.EXPO_PUBLIC_FIRESTORE_BOOKINGS_COLLECTION || 'bookings';
+const USER_FAVORITE_FACILITIES_COLLECTION = 'favorite_facilities';
 const ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed'];
 const MAX_ACTIVE_BOOKINGS_PER_USER = 2;
 
@@ -237,6 +239,14 @@ async function fetchAllFacilitySections() {
 
 function normalize(value: string) {
   return value.trim().toLowerCase();
+}
+
+function normalizeFacilityId(value: string) {
+  return normalize(value).replace(/^id\s*:\s*/i, '').replace(/^['"]|['"]$/g, '');
+}
+
+function toFavoriteDocId(facilityId: string) {
+  return encodeURIComponent(normalizeFacilityId(facilityId));
 }
 
 function getTodayDateKey() {
@@ -376,6 +386,81 @@ export async function deleteBookingForUser(bookingId: string, userId: string) {
   }
 
   await deleteDoc(bookingRef);
+}
+
+export async function listFavoriteFacilityIds(userId: string) {
+  const firestore = getFirestoreClient();
+  const snapshot = await getDocs(
+    collection(firestore, 'users', userId, USER_FAVORITE_FACILITIES_COLLECTION)
+  );
+
+  const favorites = new Set<string>();
+  snapshot.docs.forEach((favoriteDoc) => {
+    const data = favoriteDoc.data() as { facilityId?: unknown };
+    const fromField = asNullableString(data.facilityId);
+
+    if (fromField) {
+      favorites.add(normalizeFacilityId(fromField));
+      return;
+    }
+
+    try {
+      const decoded = decodeURIComponent(favoriteDoc.id);
+      if (decoded) {
+        favorites.add(normalizeFacilityId(decoded));
+      }
+    } catch {
+      if (favoriteDoc.id) {
+        favorites.add(normalizeFacilityId(favoriteDoc.id));
+      }
+    }
+  });
+
+  return Array.from(favorites);
+}
+
+export async function addFavoriteFacility(userId: string, facilityId: string) {
+  const firestore = getFirestoreClient();
+  const normalizedFacilityId = normalizeFacilityId(facilityId);
+
+  if (!normalizedFacilityId) {
+    throw new Error('Virheellinen halli-id suosikkia varten.');
+  }
+
+  await setDoc(
+    doc(
+      firestore,
+      'users',
+      userId,
+      USER_FAVORITE_FACILITIES_COLLECTION,
+      toFavoriteDocId(normalizedFacilityId)
+    ),
+    {
+      facilityId: normalizedFacilityId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function removeFavoriteFacility(userId: string, facilityId: string) {
+  const firestore = getFirestoreClient();
+  const normalizedFacilityId = normalizeFacilityId(facilityId);
+
+  if (!normalizedFacilityId) {
+    throw new Error('Virheellinen halli-id suosikin poistoon.');
+  }
+
+  await deleteDoc(
+    doc(
+      firestore,
+      'users',
+      userId,
+      USER_FAVORITE_FACILITIES_COLLECTION,
+      toFavoriteDocId(normalizedFacilityId)
+    )
+  );
 }
 
 export async function createBooking(input: CreateBookingInput) {
