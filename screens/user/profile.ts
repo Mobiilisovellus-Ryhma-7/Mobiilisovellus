@@ -63,11 +63,13 @@ export default function Profile({
 	const [passwordMessage, setPasswordMessage] = React.useState<string | null>(null);
 	const [passwordError, setPasswordError] = React.useState<string | null>(null);
 	const [showBookingsModal, setShowBookingsModal] = React.useState(false);
+	const [showBookingHistoryModal, setShowBookingHistoryModal] = React.useState(false);
 	const [isLoadingBookings, setIsLoadingBookings] = React.useState(false);
 	const [deletingBookingId, setDeletingBookingId] = React.useState<string | null>(null);
 	const [bookingsError, setBookingsError] = React.useState<string | null>(null);
 	const [userBookings, setUserBookings] = React.useState<Booking[]>([]);
 	const [facilitySectionsById, setFacilitySectionsById] = React.useState<Record<string, FacilitySection>>({});
+	const [currentTimestamp, setCurrentTimestamp] = React.useState(() => Date.now());
 
 	const openPasswordModal = React.useCallback(() => {
 		setPasswordError(null);
@@ -141,6 +143,65 @@ export default function Profile({
 
 		setShowBookingsModal(false);
 	}, [isLoadingBookings]);
+
+	const openBookingHistoryModal = React.useCallback(async () => {
+		setShowBookingHistoryModal(true);
+		await loadUserBookings();
+	}, [loadUserBookings]);
+
+	const closeBookingHistoryModal = React.useCallback(() => {
+		if (isLoadingBookings) {
+			return;
+		}
+
+		setShowBookingHistoryModal(false);
+	}, [isLoadingBookings]);
+
+	const isPastBooking = React.useCallback((booking: Booking, nowTimestamp: number) => {
+		const match = booking.bookingDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+		const timeMatch = booking.slotEnd.match(/^(\d{2}):(\d{2})$/);
+
+		if (!match || !timeMatch) {
+			return false;
+		}
+
+		const year = Number(match[1]);
+		const month = Number(match[2]) - 1;
+		const day = Number(match[3]);
+		const hour = Number(timeMatch[1]);
+		const minute = Number(timeMatch[2]);
+		const endDate = new Date(year, month, day, hour, minute, 0, 0);
+
+		if (Number.isNaN(endDate.getTime())) {
+			return false;
+		}
+
+		return endDate.getTime() <= nowTimestamp;
+	}, []);
+
+	const activeBookings = React.useMemo(
+		() => userBookings.filter((booking) => !isPastBooking(booking, currentTimestamp)),
+		[currentTimestamp, isPastBooking, userBookings]
+	);
+
+	const bookingHistory = React.useMemo(
+		() => userBookings.filter((booking) => isPastBooking(booking, currentTimestamp)),
+		[currentTimestamp, isPastBooking, userBookings]
+	);
+
+	React.useEffect(() => {
+		if (!showBookingsModal && !showBookingHistoryModal) {
+			return;
+		}
+
+		const intervalId = setInterval(() => {
+			setCurrentTimestamp(Date.now());
+		}, 30_000);
+
+		return () => {
+			clearInterval(intervalId);
+		};
+	}, [showBookingHistoryModal, showBookingsModal]);
 
 	const formatBookingDate = React.useCallback((value: string) => {
 		const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -323,6 +384,14 @@ export default function Profile({
 				),
 				React.createElement(
 					Pressable,
+					{ onPress: openBookingHistoryModal },
+					React.createElement(Text, {
+						style: [styles.menuItem, { color: colors.onSurface }],
+						children: 'Varaushistoria',
+					})
+				),
+				React.createElement(
+					Pressable,
 					{ onPress: openDeleteModal },
 					React.createElement(Text, {
 						style: [styles.menuItemDanger, { color: '#b91c1c' }],
@@ -450,17 +519,17 @@ export default function Profile({
 								children: bookingsError,
 							})
 							: null,
-						!isLoadingBookings && !bookingsError && userBookings.length === 0
+						!isLoadingBookings && !bookingsError && activeBookings.length === 0
 							? React.createElement(Text, {
 								style: styles.modalDescription,
-								children: 'Et ole tehnyt varauksia viela.',
+								children: 'Ei aktiivisia varauksia.',
 							})
 							: null,
-						!isLoadingBookings && !bookingsError && userBookings.length > 0
+						!isLoadingBookings && !bookingsError && activeBookings.length > 0
 							? React.createElement(
 								ScrollView,
 								{ style: styles.bookingsList, contentContainerStyle: styles.bookingsListContent },
-								userBookings.map((booking) => {
+								activeBookings.map((booking) => {
 									const section = facilitySectionsById[booking.facilitySectionId];
 									const facilityName =
 										section?.facilityName || section?.description || 'Tuntematon halli';
@@ -529,6 +598,101 @@ export default function Profile({
 								mode: 'contained',
 								onPress: closeBookingsModal,
 								disabled: isLoadingBookings || !!deletingBookingId,
+								children: 'Sulje',
+							})
+						)
+					)
+				)
+			),
+			React.createElement(
+				Modal,
+				{
+					visible: showBookingHistoryModal,
+					transparent: true,
+					animationType: 'fade',
+					onRequestClose: closeBookingHistoryModal,
+				},
+				React.createElement(
+					Pressable,
+					{ style: styles.modalBackdrop, onPress: closeBookingHistoryModal },
+					React.createElement(
+						Pressable,
+						{ style: styles.modalCard, onPress: () => undefined },
+						React.createElement(Text, {
+							style: styles.modalTitle,
+							children: 'Varaushistoria',
+						}),
+						isLoadingBookings
+							? React.createElement(Text, {
+								style: styles.modalDescription,
+								children: 'Ladataan varauksia...',
+							})
+							: null,
+						bookingsError
+							? React.createElement(Text, {
+								style: styles.errorText,
+								children: bookingsError,
+							})
+							: null,
+						!isLoadingBookings && !bookingsError && bookingHistory.length === 0
+							? React.createElement(Text, {
+								style: styles.modalDescription,
+								children: 'Ei menneita varauksia.',
+							})
+							: null,
+						!isLoadingBookings && !bookingsError && bookingHistory.length > 0
+							? React.createElement(
+								ScrollView,
+								{ style: styles.bookingsList, contentContainerStyle: styles.bookingsListContent },
+								bookingHistory.map((booking) => {
+									const section = facilitySectionsById[booking.facilitySectionId];
+									const facilityName =
+										section?.facilityName || section?.description || 'Tuntematon halli';
+									const sport = section?.sport?.trim() ?? '';
+									const sectionName = section?.name?.trim() ?? '';
+									const hasSportInName =
+										sport.length > 0 &&
+										sectionName.toLowerCase().includes(sport.toLowerCase());
+									const utilitiesText = sport && sectionName
+										? hasSportInName
+											? sectionName
+											: `${sport}, ${sectionName}`
+										: sport || sectionName || 'Tietoja ei saatavilla';
+
+									return React.createElement(
+										View,
+										{ key: booking.id, style: styles.bookingItem },
+										React.createElement(
+											View,
+											{ style: styles.bookingHeaderRow },
+											React.createElement(Text, {
+												style: styles.bookingFacilityName,
+												children: facilityName,
+											}),
+											React.createElement(Text, {
+												style: styles.bookingDate,
+												children: formatBookingDate(booking.bookingDate),
+											})
+										),
+										React.createElement(Text, {
+											style: styles.bookingTitle,
+											children: utilitiesText,
+										}),
+										React.createElement(Text, {
+											style: styles.bookingMeta,
+											children: `${booking.slotStart}-${booking.slotEnd}`,
+										})
+									);
+								}),
+							)
+							: null,
+						React.createElement(
+							View,
+							{ style: styles.modalActions },
+							React.createElement(Button, {
+								mode: 'contained',
+								onPress: closeBookingHistoryModal,
+								disabled: isLoadingBookings,
 								children: 'Sulje',
 							})
 						)

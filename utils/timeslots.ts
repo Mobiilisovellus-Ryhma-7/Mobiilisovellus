@@ -33,7 +33,17 @@ function isSameDay(left: Date, right: Date) {
 }
 
 function isPastSlot(slotStart: Date, selectedDay: Date, now: Date) {
-  if (!isSameDay(selectedDay, now)) {
+  const startOfSelectedDay = new Date(selectedDay);
+  startOfSelectedDay.setHours(0, 0, 0, 0);
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  if (startOfSelectedDay.getTime() < startOfToday.getTime()) {
+    return true;
+  }
+
+  if (startOfSelectedDay.getTime() > startOfToday.getTime()) {
     return false;
   }
 
