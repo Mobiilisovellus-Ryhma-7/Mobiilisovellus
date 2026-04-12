@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { onAuthStateChanged } from 'firebase/auth';
 import MainPage from '../screens/main/mainpage';
@@ -57,7 +58,8 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         headerShown: false,
         gestureEnabled: true,
         fullScreenGestureEnabled: true,
-        animation: 'slide_from_right',
+        freezeOnBlur: true,
+        animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
       }}
     >
       <Stack.Screen name="main">

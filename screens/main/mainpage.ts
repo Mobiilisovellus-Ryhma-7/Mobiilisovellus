@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Image,
+  Pressable,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -96,15 +97,18 @@ export default function MainPage({
         )
       ),
       React.createElement(
-        Surface,
-        { style: styles.bottomNav, elevation: 1 },
+        Pressable,
+        {
+          onPress: onOpenProfile,
+          style: styles.bottomNav,
+          accessibilityRole: 'button',
+          accessibilityLabel: 'Avaa profiili',
+        },
         React.createElement(IconButton, {
           mode: 'contained-tonal',
           icon: 'account',
-          onPress: onOpenProfile,
           size: metrics.scale(24, 20, 28),
           style: styles.profileButton,
-          accessibilityLabel: 'Avaa profiili',
         }),
         React.createElement(Text, {
           style: [styles.profileLabel, { color: colors.onSurfaceVariant }],

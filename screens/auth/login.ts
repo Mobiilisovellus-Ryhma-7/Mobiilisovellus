@@ -125,7 +125,7 @@ export default function Login({
 
 			React.createElement(Text, {
 				style: [styles.label, { color: colors.primary }],
-				children: 'Email',
+				children: 'Sähköposti',
 			}),
 			React.createElement(TextInput, {
 				mode: 'flat',
@@ -140,7 +140,7 @@ export default function Login({
 
 			React.createElement(Text, {
 				style: [styles.label, styles.passwordLabel, { color: colors.primary }],
-				children: 'Password',
+				children: 'Salasana',
 			}),
 			React.createElement(TextInput, {
 				mode: 'flat',
