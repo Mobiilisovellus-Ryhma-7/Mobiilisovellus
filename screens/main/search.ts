@@ -1173,6 +1173,15 @@ export default function Search({
             children: 'Ei vapaita vuoroja valitulla päivällä.',
           }),
         ];
+  const currentFiltersText = `Nykyiset suodattimet: Laji: ${sportInput.trim() || 'ei valittu'}, Paikka: ${nameInput.trim() || 'ei valittu'}, Pvm: ${
+    activeDateFilter
+      ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
+      : 'ei valittu'
+  }, Suosikit: ${showFavoritesOnly ? 'paalla' : 'pois'}`;
+  const hasSportFilter = sportInput.trim().length > 0;
+  const hasPlaceFilter = nameInput.trim().length > 0;
+  const hasDateFilter = !!activeDateFilter;
+  const hasFavoritesFilter = showFavoritesOnly;
 
   return React.createElement(
     Screen,
@@ -1214,9 +1223,9 @@ export default function Search({
             mode: 'flat',
             compact: true,
             showSelectedCheck: false,
-            style: styles.filterChip,
-            textStyle: styles.filterChipText,
-            selected: searchMode === 'sport',
+            style: [styles.filterChip, hasSportFilter ? styles.filterChipActive : null],
+            textStyle: [styles.filterChipText, hasSportFilter ? styles.filterChipTextActive : null],
+            selected: hasSportFilter,
             onPress: openSportPicker,
             children: 'Laji',
           }),
@@ -1224,9 +1233,9 @@ export default function Search({
             mode: 'flat',
             compact: true,
             showSelectedCheck: false,
-            style: styles.filterChip,
-            textStyle: styles.filterChipText,
-            selected: searchMode === 'name',
+            style: [styles.filterChip, hasPlaceFilter ? styles.filterChipActive : null],
+            textStyle: [styles.filterChipText, hasPlaceFilter ? styles.filterChipTextActive : null],
+            selected: hasPlaceFilter,
             onPress: openPlacePicker,
             children: 'Paikka',
           }),
@@ -1234,24 +1243,27 @@ export default function Search({
             mode: 'flat',
             compact: true,
             showSelectedCheck: false,
-            style: styles.filterChip,
-            textStyle: styles.filterChipText,
+            style: [styles.filterChip, hasDateFilter ? styles.filterChipActive : null],
+            textStyle: [styles.filterChipText, hasDateFilter ? styles.filterChipTextActive : null],
+            selected: hasDateFilter,
             onPress: () => setIsDatePickerVisible(true),
-            children: activeDateFilter
-              ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
-              : 'Pvm',
+            children: 'Pvm',
           }),
           React.createElement(Chip, {
             mode: 'flat',
             compact: true,
             showSelectedCheck: false,
-            style: styles.filterChip,
-            textStyle: styles.filterChipText,
-            selected: showFavoritesOnly,
+            style: [styles.filterChip, hasFavoritesFilter ? styles.filterChipActive : null],
+            textStyle: [styles.filterChipText, hasFavoritesFilter ? styles.filterChipTextActive : null],
+            selected: hasFavoritesFilter,
             onPress: toggleFavoritesFilter,
             children: 'Suosikit',
           })
         ),
+        React.createElement(Text, {
+          style: styles.currentFiltersText,
+          children: currentFiltersText,
+        }),
       ),
       React.createElement(
         Surface,
@@ -1772,12 +1784,29 @@ const createStyles = (
       minHeight: metrics.scale(34, 30, 40),
       justifyContent: 'center',
       backgroundColor: colors.surfaceVariant,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    filterChipActive: {
+      backgroundColor: '#dbeafe',
+      borderColor: '#60a5fa',
     },
     filterChipText: {
       fontSize: metrics.scale(12, 11, 15),
       fontWeight: '600',
       color: colors.onSurface,
       textAlign: 'center',
+    },
+    filterChipTextActive: {
+      color: '#1d4ed8',
+      fontWeight: '700',
+    },
+    currentFiltersText: {
+      marginTop: metrics.scale(8, 6, 10),
+      color: colors.onSurfaceVariant,
+      fontSize: metrics.scale(12, 11, 14),
+      textAlign: 'center',
+      paddingHorizontal: metrics.scale(2, 0, 6),
     },
     textInput: {
       marginTop: metrics.scale(10, 8, 14),
