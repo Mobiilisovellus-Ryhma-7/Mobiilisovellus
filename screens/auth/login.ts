@@ -13,7 +13,7 @@ import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
-import { signInUser } from '../../services/auth';
+import { useLogin } from '../../hooks';
 
 type LoginProps = {
 	onBack?: () => void;
@@ -34,40 +34,7 @@ export default function Login({
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
-	const [email, setEmail] = React.useState('');
-	const [password, setPassword] = React.useState('');
-	const [secureEntry, setSecureEntry] = React.useState(true);
-	const [isSubmitting, setIsSubmitting] = React.useState(false);
-	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-
-	const handleLogin = React.useCallback(async () => {
-		const trimmedEmail = email.trim();
-
-		if (!trimmedEmail) {
-			setErrorMessage('Syötä sähköposti.');
-			return;
-		}
-
-		if (!password) {
-			setErrorMessage('Syötä salasana.');
-			return;
-		}
-
-		setIsSubmitting(true);
-		setErrorMessage(null);
-
-		try {
-			await signInUser({
-				email: trimmedEmail,
-				password,
-			});
-			onLogin?.();
-		} catch (error) {
-			setErrorMessage(error instanceof Error ? error.message : 'Kirjautuminen epäonnistui.');
-		} finally {
-			setIsSubmitting(false);
-		}
-	}, [email, onLogin, password]);
+	const { email, setEmail, password, setPassword, secureEntry, toggleSecureEntry, isSubmitting, errorMessage, handleLogin } = useLogin(onLogin);
 
 	return React.createElement(
 		Screen,
@@ -154,7 +121,7 @@ export default function Login({
 				contentStyle: styles.inputContent,
 				right: React.createElement(TextInput.Icon, {
 					icon: secureEntry ? 'eye-outline' : 'eye-off-outline',
-					onPress: () => setSecureEntry((prev) => !prev),
+					onPress: toggleSecureEntry,
 					forceTextInputFocus: false,
 				}),
 			}),

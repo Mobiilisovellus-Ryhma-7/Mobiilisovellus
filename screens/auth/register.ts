@@ -13,7 +13,7 @@ import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
-import { registerUser } from '../../services/auth';
+import { useRegister } from '../../hooks';
 
 type RegisterProps = {
 	onBack?: () => void;
@@ -27,39 +27,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
-	const [email, setEmail] = React.useState('');
-	const [password, setPassword] = React.useState('');
-	const [isSubmitting, setIsSubmitting] = React.useState(false);
-	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-
-	const handleRegister = React.useCallback(async () => {
-		const trimmedEmail = email.trim();
-
-		if (!trimmedEmail) {
-			setErrorMessage('Syötä sähköposti.');
-			return;
-		}
-
-		if (password.length < 6) {
-			setErrorMessage('Salasanan on oltava vähintään 6 merkkiä.');
-			return;
-		}
-
-		setIsSubmitting(true);
-		setErrorMessage(null);
-
-		try {
-			await registerUser({
-				email: trimmedEmail,
-				password,
-			});
-			onRegister?.();
-		} catch (error) {
-			setErrorMessage(error instanceof Error ? error.message : 'Rekisteröinti epäonnistui.');
-		} finally {
-			setIsSubmitting(false);
-		}
-	}, [email, onRegister, password]);
+	const { email, setEmail, password, setPassword, isSubmitting, errorMessage, handleRegister } = useRegister(onRegister);
 
 	return React.createElement(
 		Screen,
