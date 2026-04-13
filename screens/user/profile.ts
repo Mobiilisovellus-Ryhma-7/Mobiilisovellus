@@ -23,6 +23,7 @@ type ProfileProps = {
 	onGoHome?: () => void;
 	isDarkMode: boolean;
 	onToggleDarkMode: () => void;
+	openBookingsOnMount?: boolean;
 };
 
 export default function Profile({
@@ -31,6 +32,7 @@ export default function Profile({
 	onGoHome,
 	isDarkMode,
 	onToggleDarkMode,
+	openBookingsOnMount,
 }: ProfileProps) {
 	const { colors, dark } = useTheme();
 	const { width } = useWindowDimensions();
@@ -91,6 +93,12 @@ export default function Profile({
 		trainingSummary,
 		formatBookingDate,
 	} = useProfile({ onSignOut });
+
+	React.useEffect(() => {
+		if (openBookingsOnMount) {
+			void openBookingsModal();
+		}
+	}, [openBookingsOnMount, openBookingsModal]);
 
 	return React.createElement(
 		Screen,

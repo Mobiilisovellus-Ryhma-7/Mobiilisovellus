@@ -1,17 +1,27 @@
 import React from 'react';
 import {
   Image,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Button, IconButton, Surface, Text, useTheme } from 'react-native-paper';
+import { Button, Icon, Surface, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import {
+  auth,
+  db,
+  Booking,
+  FacilitySection,
+  getBookingsForUserId,
+  listFacilitySections,
+} from '../../services/firebase';
 
 type MainPageProps = {
   onOpenFacilities?: () => void;
@@ -29,6 +39,12 @@ export default function MainPage({
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics, colors, dark), [colors, dark, metrics]);
   const [isSignedIn, setIsSignedIn] = React.useState(false);
+  const [profilePhotoUri, setProfilePhotoUri] = React.useState<string | null>(null);
+  const [showBookingsModal, setShowBookingsModal] = React.useState(false);
+  const [isLoadingBookings, setIsLoadingBookings] = React.useState(false);
+  const [bookingsError, setBookingsError] = React.useState<string | null>(null);
+  const [userBookings, setUserBookings] = React.useState<Booking[]>([]);
+  const [facilitySectionsById, setFacilitySectionsById] = React.useState<Record<string, FacilitySection>>({});
 
   React.useEffect(() => {
     if (!auth) {
@@ -38,10 +54,129 @@ export default function MainPage({
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsSignedIn(!!user);
+      if (!user) {
+        setProfilePhotoUri(null);
+        setShowBookingsModal(false);
+        setBookingsError(null);
+        setUserBookings([]);
+        setFacilitySectionsById({});
+      }
     });
 
     return unsubscribe;
   }, []);
+
+  React.useEffect(() => {
+    const userId = auth?.currentUser?.uid;
+    if (!isSignedIn || !userId || !db) {
+      setProfilePhotoUri(null);
+      return;
+    }
+
+    let isActive = true;
+
+    getDoc(doc(db, 'users', userId))
+      .then((snapshot) => {
+        if (!isActive || !snapshot.exists()) {
+          return;
+        }
+
+        const data = snapshot.data() as { profilePhotoUri?: unknown };
+        if (typeof data.profilePhotoUri === 'string' && data.profilePhotoUri.trim()) {
+          setProfilePhotoUri(data.profilePhotoUri.trim());
+          return;
+        }
+
+        setProfilePhotoUri(null);
+      })
+      .catch(() => {
+        if (isActive) {
+          setProfilePhotoUri(null);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isSignedIn]);
+
+  const activeBookings = React.useMemo(
+    () => {
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`;
+      const currentTimeKey = `${`${now.getHours()}`.padStart(2, '0')}:${`${now.getMinutes()}`.padStart(2, '0')}`;
+
+      return userBookings.filter((booking) => {
+        if (booking.status === 'cancelled') {
+          return false;
+        }
+
+        if (booking.bookingDate > todayKey) {
+          return true;
+        }
+
+        if (booking.bookingDate < todayKey) {
+          return false;
+        }
+
+        return booking.slotEnd >= currentTimeKey;
+      });
+    },
+    [userBookings]
+  );
+
+  const formatBookingDate = React.useCallback((value: string) => {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return value;
+    }
+
+    return `${match[3]}.${match[2]}.${match[1]}`;
+  }, []);
+
+  const openBookingsModal = React.useCallback(async () => {
+    const userId = auth?.currentUser?.uid;
+
+    if (!userId || !db) {
+      setBookingsError('Kirjaudu sisaan nahdaksesi varauksesi.');
+      setShowBookingsModal(true);
+      return;
+    }
+
+    setShowBookingsModal(true);
+    setIsLoadingBookings(true);
+    setBookingsError(null);
+
+    try {
+      const [bookings, sections] = await Promise.all([
+        getBookingsForUserId(userId),
+        listFacilitySections(),
+      ]);
+
+      const sectionsById = sections.reduce<Record<string, FacilitySection>>((acc, section) => {
+        acc[section.id] = section;
+        return acc;
+      }, {});
+
+      setFacilitySectionsById(sectionsById);
+      setUserBookings(bookings);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Varausten haku epaonnistui.';
+      setBookingsError(message);
+      setFacilitySectionsById({});
+      setUserBookings([]);
+    } finally {
+      setIsLoadingBookings(false);
+    }
+  }, []);
+
+  const closeBookingsModal = React.useCallback(() => {
+    if (isLoadingBookings) {
+      return;
+    }
+
+    setShowBookingsModal(false);
+  }, [isLoadingBookings]);
 // Pääsivu
   return React.createElement(
     Screen,
@@ -70,7 +205,7 @@ export default function MainPage({
             React.createElement(Text, {
               key: 'hero-subtitle',
               style: [styles.subtitle, { color: colors.onSurfaceVariant }],
-              children: 'Varaa vuorot helposti ja nopeasti.',
+              children: 'Varaa vuorot helposti ja nopeasti !',
             }),
             React.createElement(
               View,
@@ -92,39 +227,137 @@ export default function MainPage({
                     labelStyle: styles.secondaryButtonText,
                     children: 'Kirjaudu',
                   })
-                : React.createElement(
-                    Surface,
-                    {
-                      style: styles.signedInBadge,
-                      elevation: 0,
-                      children: React.createElement(Text, {
-                        style: styles.signedInText,
-                        children: 'Olet kirjautunut sisään',
-                      }),
-                    }
-                  )
+                  : React.createElement(Button, {
+                    mode: 'contained-tonal',
+                    onPress: openBookingsModal,
+                    style: styles.secondaryButton,
+                    contentStyle: styles.buttonContent,
+                    labelStyle: styles.secondaryButtonText,
+                    children: 'Omat varaukset',
+                  })
             ),
           ],
         }
       ),
+      isSignedIn
+        ? React.createElement(
+            Pressable,
+            {
+              onPress: onOpenProfile,
+              style: styles.profileIconButton,
+              accessibilityRole: 'button',
+              accessibilityLabel: 'Avaa profiili',
+            },
+            profilePhotoUri
+              ? React.createElement(Image, {
+                  source: { uri: profilePhotoUri },
+                  style: styles.profileImage,
+                })
+              : React.createElement(Icon, {
+                  source: 'account',
+                  size: metrics.scale(26, 22, 30),
+                  color: colors.onSurface,
+                })
+          )
+        : null
+      ,
       React.createElement(
-        Pressable,
+        Modal,
         {
-          onPress: onOpenProfile,
-          style: styles.bottomNav,
-          accessibilityRole: 'button',
-          accessibilityLabel: 'Avaa profiili',
+          visible: showBookingsModal,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: closeBookingsModal,
         },
-        React.createElement(IconButton, {
-          mode: 'contained-tonal',
-          icon: 'account',
-          size: metrics.scale(24, 20, 28),
-          style: styles.profileButton,
-        }),
-        React.createElement(Text, {
-          style: [styles.profileLabel, { color: colors.onSurfaceVariant }],
-          children: 'Profiili',
-        })
+        React.createElement(
+          Pressable,
+          { style: styles.modalBackdrop, onPress: closeBookingsModal },
+          React.createElement(
+            Pressable,
+            { style: styles.modalCard, onPress: () => undefined },
+            React.createElement(Text, {
+              style: styles.modalTitle,
+              children: 'Omat varaukset',
+            }),
+            isLoadingBookings
+              ? React.createElement(Text, {
+                  style: styles.modalDescription,
+                  children: 'Ladataan varauksia...',
+                })
+              : null,
+            bookingsError
+              ? React.createElement(Text, {
+                  style: styles.errorText,
+                  children: bookingsError,
+                })
+              : null,
+            !isLoadingBookings && !bookingsError && activeBookings.length === 0
+              ? React.createElement(Text, {
+                  style: styles.modalDescription,
+                  children: 'Ei aktiivisia varauksia.',
+                })
+              : null,
+            !isLoadingBookings && !bookingsError && activeBookings.length > 0
+              ? React.createElement(
+                  ScrollView,
+                  { style: styles.bookingsList, contentContainerStyle: styles.bookingsListContent },
+                  activeBookings.map((booking) => {
+                    const section = facilitySectionsById[booking.facilitySectionId];
+                    const facilityName =
+                      section?.facilityName || section?.description || 'Tuntematon halli';
+                    const sport = section?.sport?.trim() ?? '';
+                    const sectionName = section?.name?.trim() ?? '';
+                    const hasSportInName =
+                      sport.length > 0 && sectionName.toLowerCase().includes(sport.toLowerCase());
+                    const utilitiesText = sport && sectionName
+                      ? hasSportInName
+                        ? sectionName
+                        : `${sport}, ${sectionName}`
+                      : sport || sectionName || 'Tietoja ei saatavilla';
+
+                    return React.createElement(
+                      View,
+                      { key: booking.id, style: styles.bookingItem },
+                      React.createElement(
+                        View,
+                        { style: styles.bookingHeaderRow },
+                        React.createElement(Text, {
+                          style: styles.bookingFacilityName,
+                          children: facilityName,
+                        }),
+                        React.createElement(Text, {
+                          style: styles.bookingDate,
+                          children: formatBookingDate(booking.bookingDate),
+                        })
+                      ),
+                      React.createElement(Text, {
+                        style: styles.bookingTitle,
+                        children: utilitiesText,
+                      }),
+                      React.createElement(Text, {
+                        style: styles.bookingMeta,
+                        children: `${booking.slotStart}-${booking.slotEnd}`,
+                      }),
+                      React.createElement(Text, {
+                        style: styles.bookingStatus,
+                        children: booking.status,
+                      })
+                    );
+                  })
+                )
+              : null,
+            React.createElement(
+              View,
+              { style: styles.modalActions },
+              React.createElement(Button, {
+                mode: 'contained',
+                onPress: closeBookingsModal,
+                disabled: isLoadingBookings,
+                children: 'Sulje',
+              })
+            )
+          )
+        )
       )
     )
   );
@@ -220,26 +453,108 @@ const createStyles = (
       fontWeight: '700',
       color: colors.onSurfaceVariant,
     },
-    bottomNav: {
-      width: '100%',
-      maxWidth: metrics.contentMaxWidth,
-      flexDirection: 'row',
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.55)',
       justifyContent: 'center',
       alignItems: 'center',
+      paddingHorizontal: metrics.horizontalPadding,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: metrics.contentMaxWidth,
+      maxHeight: '80%',
+      backgroundColor: dark ? '#1e293b' : colors.surface,
+      borderRadius: metrics.scale(24, 18, 30),
+      paddingHorizontal: metrics.scale(18, 16, 24),
+      paddingTop: metrics.scale(18, 16, 22),
+      paddingBottom: metrics.scale(14, 12, 18),
+      borderWidth: 1,
+      borderColor: dark ? '#334155' : colors.outline,
+    },
+    modalTitle: {
+      fontSize: metrics.scale(22, 18, 28),
+      fontWeight: '700',
+      color: colors.onSurface,
+      marginBottom: metrics.scale(10, 8, 12),
+    },
+    modalDescription: {
+      fontSize: metrics.scale(14, 12, 16),
+      lineHeight: metrics.scale(20, 18, 24),
+      color: colors.onSurfaceVariant,
+      marginBottom: metrics.scale(8, 6, 10),
+    },
+    errorText: {
+      fontSize: metrics.scale(14, 12, 16),
+      lineHeight: metrics.scale(20, 18, 24),
+      color: '#b91c1c',
+      fontWeight: '600',
+      marginBottom: metrics.scale(8, 6, 10),
+    },
+    bookingsList: {
+      width: '100%',
+    },
+    bookingsListContent: {
+      gap: metrics.scale(10, 8, 12),
+      paddingVertical: metrics.scale(4, 2, 6),
+    },
+    bookingItem: {
+      borderRadius: metrics.scale(16, 12, 18),
+      paddingHorizontal: metrics.scale(14, 12, 16),
+      paddingVertical: metrics.scale(12, 10, 14),
+      backgroundColor: colors.surfaceVariant,
+      gap: metrics.scale(4, 3, 6),
+    },
+    bookingHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       gap: metrics.scale(8, 6, 10),
-      alignSelf: 'center',
-      paddingVertical: metrics.scale(8, 6, 10),
-      borderRadius: metrics.scale(18, 14, 22),
+    },
+    bookingFacilityName: {
+      flex: 1,
+      fontSize: metrics.scale(16, 14, 18),
+      fontWeight: '700',
+      color: colors.onSurface,
+    },
+    bookingDate: {
+      fontSize: metrics.scale(13, 11, 15),
+      color: colors.onSurfaceVariant,
+      fontWeight: '600',
+    },
+    bookingTitle: {
+      fontSize: metrics.scale(14, 12, 16),
+      color: colors.onSurfaceVariant,
+    },
+    bookingMeta: {
+      fontSize: metrics.scale(14, 12, 16),
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    bookingStatus: {
+      fontSize: metrics.scale(12, 10, 14),
+      color: colors.primary,
+      fontWeight: '700',
+      textTransform: 'capitalize',
+    },
+    modalActions: {
+      marginTop: metrics.scale(12, 10, 14),
+      alignItems: 'flex-end',
+    },
+    profileIconButton: {
+      width: metrics.scale(66, 58, 74),
+      height: metrics.scale(66, 58, 74),
+      borderRadius: metrics.scale(33, 29, 37),
+      alignSelf: 'flex-end',
+      justifyContent: 'center',
+      alignItems: 'center',
       backgroundColor: dark ? '#1e293b' : colors.surface,
       borderWidth: 1,
       borderColor: dark ? '#334155' : colors.outline,
     },
-    profileButton: {
-      margin: 0,
-    },
-    profileLabel: {
-      fontSize: metrics.scale(14, 12, 16),
-      fontWeight: '700',
-      marginRight: metrics.scale(8, 6, 10),
+    profileImage: {
+      width: metrics.scale(62, 54, 70),
+      height: metrics.scale(62, 54, 70),
+      borderRadius: metrics.scale(31, 27, 35),
     },
   });
