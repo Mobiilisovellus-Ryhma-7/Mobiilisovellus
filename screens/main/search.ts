@@ -224,7 +224,7 @@ export default function Search({
   const { colors, dark } = useTheme();
   const { width } = useWindowDimensions();
   const metrics = getResponsiveMetrics(width);
-  const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
+  const styles = React.useMemo(() => createStyles(metrics, colors, dark), [colors, dark, metrics]);
 
   const [selectedSection, setSelectedSection] = React.useState<FacilitySection | null>(null);
   const [sections, setSections] = React.useState<FacilitySection[]>([]);
@@ -678,6 +678,19 @@ export default function Search({
 
     setShowFavoritesOnly((current) => !current);
   }, [currentUserId]);
+
+  const clearAllFilters = React.useCallback(async () => {
+    setSportInput('');
+    setNameInput('');
+    setActiveDateFilter(null);
+    setShowFavoritesOnly(false);
+    setSearchMode('all');
+    setIsSportPickerOpen(false);
+    setIsPlacePickerOpen(false);
+    setErrorMessage(null);
+
+    await runSearch('all');
+  }, [runSearch]);
 
   const applyDateFilter = React.useCallback((date: Date) => {
     const nextDateFilter = formatDateAsDbDate(date);
@@ -1173,11 +1186,6 @@ export default function Search({
             children: 'Ei vapaita vuoroja valitulla päivällä.',
           }),
         ];
-  const currentFiltersText = `Nykyiset suodattimet: Laji: ${sportInput.trim() || 'ei valittu'}, Paikka: ${nameInput.trim() || 'ei valittu'}, Pvm: ${
-    activeDateFilter
-      ? `${`${selectedDate.getDate()}`.padStart(2, '0')}.${`${selectedDate.getMonth() + 1}`.padStart(2, '0')}.${selectedDate.getFullYear()}`
-      : 'ei valittu'
-  }, Suosikit: ${showFavoritesOnly ? 'paalla' : 'pois'}`;
   const hasSportFilter = sportInput.trim().length > 0;
   const hasPlaceFilter = nameInput.trim().length > 0;
   const hasDateFilter = !!activeDateFilter;
@@ -1227,6 +1235,8 @@ export default function Search({
             textStyle: [styles.filterChipText, hasSportFilter ? styles.filterChipTextActive : null],
             selected: hasSportFilter,
             onPress: openSportPicker,
+            onClose: hasSportFilter ? clearAllFilters : undefined,
+            closeIcon: 'close',
             children: 'Laji',
           }),
           React.createElement(Chip, {
@@ -1237,6 +1247,8 @@ export default function Search({
             textStyle: [styles.filterChipText, hasPlaceFilter ? styles.filterChipTextActive : null],
             selected: hasPlaceFilter,
             onPress: openPlacePicker,
+            onClose: hasPlaceFilter ? clearAllFilters : undefined,
+            closeIcon: 'close',
             children: 'Paikka',
           }),
           React.createElement(Chip, {
@@ -1247,6 +1259,8 @@ export default function Search({
             textStyle: [styles.filterChipText, hasDateFilter ? styles.filterChipTextActive : null],
             selected: hasDateFilter,
             onPress: () => setIsDatePickerVisible(true),
+            onClose: hasDateFilter ? clearAllFilters : undefined,
+            closeIcon: 'close',
             children: 'Pvm',
           }),
           React.createElement(Chip, {
@@ -1257,13 +1271,11 @@ export default function Search({
             textStyle: [styles.filterChipText, hasFavoritesFilter ? styles.filterChipTextActive : null],
             selected: hasFavoritesFilter,
             onPress: toggleFavoritesFilter,
+            onClose: hasFavoritesFilter ? clearAllFilters : undefined,
+            closeIcon: 'close',
             children: 'Suosikit',
           })
         ),
-        React.createElement(Text, {
-          style: styles.currentFiltersText,
-          children: currentFiltersText,
-        }),
       ),
       React.createElement(
         Surface,
@@ -1706,7 +1718,8 @@ export default function Search({
 
 const createStyles = (
   metrics: ReturnType<typeof getResponsiveMetrics>,
-  colors: any
+  colors: any,
+  dark: boolean
 ) =>
   StyleSheet.create({
     safeArea: {
@@ -1800,13 +1813,6 @@ const createStyles = (
     filterChipTextActive: {
       color: '#1d4ed8',
       fontWeight: '700',
-    },
-    currentFiltersText: {
-      marginTop: metrics.scale(8, 6, 10),
-      color: colors.onSurfaceVariant,
-      fontSize: metrics.scale(12, 11, 14),
-      textAlign: 'center',
-      paddingHorizontal: metrics.scale(2, 0, 6),
     },
     textInput: {
       marginTop: metrics.scale(10, 8, 14),
@@ -1958,6 +1964,8 @@ const createStyles = (
       width: '100%',
       maxWidth: metrics.isTablet ? 460 : 360,
       backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: '#cfd8e3',
       borderRadius: metrics.scale(24, 18, 30),
       padding: metrics.scale(16, 12, 20),
       gap: metrics.scale(12, 10, 16),
@@ -2020,6 +2028,8 @@ const createStyles = (
     modalCard: {
       width: '100%',
       backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: '#cfd8e3',
       borderRadius: metrics.scale(18, 14, 24),
       paddingHorizontal: metrics.scale(18, 14, 26),
       paddingVertical: metrics.scale(14, 12, 22),
