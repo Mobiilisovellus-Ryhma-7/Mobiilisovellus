@@ -26,7 +26,7 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 	const { colors, dark } = useTheme();
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
-	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
+	const styles = React.useMemo(() => createStyles(metrics, colors, dark), [colors, dark, metrics]);
 	const { email, setEmail, password, setPassword, isSubmitting, errorMessage, handleRegister } = useRegister(onRegister);
 
 	return React.createElement(
@@ -152,7 +152,8 @@ export default function Register({ onBack, onRegister, onGoLogin, onGoHome }: Re
 
 const createStyles = (
 	metrics: ReturnType<typeof getResponsiveMetrics>,
-	colors: any
+	colors: any,
+	dark: boolean
 ) =>
 	StyleSheet.create({
 		safeArea: {
@@ -173,10 +174,17 @@ const createStyles = (
 		contentWrap: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
-			backgroundColor: colors.surface,
+			backgroundColor: dark ? '#1e293b' : colors.surface,
+			borderWidth: 1,
+			borderColor: dark ? '#334155' : colors.outline,
 			borderRadius: metrics.scale(22, 18, 28),
 			paddingHorizontal: metrics.scale(18, 14, 26),
 			paddingVertical: metrics.scale(16, 12, 22),
+			shadowColor: '#000000',
+			shadowOffset: { width: 0, height: 8 },
+			shadowOpacity: dark ? 0.35 : 0.12,
+			shadowRadius: 22,
+			elevation: dark ? 12 : 6,
 		},
 		headerRow: {
 			flexDirection: 'row',
