@@ -37,6 +37,7 @@ type AppNavigatorProps = {
 
 export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNavigatorProps) {
   const [isSignedIn, setIsSignedIn] = React.useState(false);
+  const stackBackgroundColor = isDarkMode ? '#0f172a' : '#ececec';
 
   React.useEffect(() => {
     if (!auth) {
@@ -58,8 +59,10 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         headerShown: false,
         gestureEnabled: true,
         fullScreenGestureEnabled: true,
-        freezeOnBlur: true,
+        freezeOnBlur: Platform.OS !== 'android',
         animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
+        contentStyle: { backgroundColor: stackBackgroundColor },
+        statusBarStyle: isDarkMode ? 'light' : 'dark',
       }}
     >
       <Stack.Screen name="main">

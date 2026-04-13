@@ -112,34 +112,46 @@ export default function Profile({
 			},
 			React.createElement(
 				View,
-				{ style: styles.headerRow },
+				{ style: [styles.topChrome, { backgroundColor: colors.background }] },
+				React.createElement(
+					View,
+					{ style: styles.headerRow },
+					React.createElement(
+						Pressable,
+						{ style: styles.backButton, onPress: onBack },
+						React.createElement(Text, { style: styles.backIcon, children: '‹' })
+					),
+					React.createElement(Text, {
+						style: [styles.headerTitle, { color: colors.onSurface }],
+						children: 'HALLILLE',
+					}),
+					React.createElement(View, { style: styles.headerSpacer })
+				),
 				React.createElement(
 					Pressable,
-					{ style: styles.backButton, onPress: onBack },
-					React.createElement(Text, { style: styles.backIcon, children: '‹' })
-				),
-				React.createElement(Text, {
-					style: [styles.headerTitle, { color: colors.onSurface }],
-					children: 'HALLILLE',
-				}),
-				React.createElement(View, { style: styles.headerSpacer })
-			),
-			React.createElement(
-				Pressable,
-				{ onPress: onGoHome },
-				React.createElement(Image, {
-					source: getDynamicSportHallLogoSource(dark),
-					style: styles.logo,
-					resizeMode: 'contain',
-				})
+					{ onPress: onGoHome },
+					React.createElement(Image, {
+						source: getDynamicSportHallLogoSource(dark),
+						style: styles.logo,
+						resizeMode: 'contain',
+					})
+				)
 			),
 
+			React.createElement(View, { style: styles.scrollViewportDivider }),
+
+			React.createElement(
+				View,
+				{ style: styles.scrollViewport },
 			React.createElement(
 				ScrollView,
 				{
 					style: styles.menuScroll,
 					contentContainerStyle: styles.menuContent,
 					showsVerticalScrollIndicator: false,
+					bounces: false,
+					alwaysBounceVertical: false,
+					overScrollMode: 'never',
 				},
 				React.createElement(
 					View,
@@ -784,6 +796,7 @@ export default function Profile({
 					)
 				)
 			)
+			)
 		)
 	);
 }
@@ -805,6 +818,24 @@ const createStyles = (
 			paddingTop: metrics.scale(20, 14, 30),
 			paddingBottom: metrics.scale(20, 16, 28),
 			alignItems: 'center',
+		},
+		topChrome: {
+			width: '100%',
+			alignItems: 'center',
+		},
+		scrollViewportDivider: {
+			width: '100%',
+			maxWidth: metrics.contentMaxWidth,
+			height: 1,
+			marginTop: metrics.scale(10, 8, 14),
+			backgroundColor: dark ? '#334155' : '#cbd5e1',
+		},
+		scrollViewport: {
+			width: '100%',
+			flex: 1,
+			overflow: 'hidden',
+			alignItems: 'center',
+			paddingTop: metrics.scale(8, 6, 12),
 		},
 		headerRow: {
 			width: '100%',
@@ -845,10 +876,12 @@ const createStyles = (
 		menuScroll: {
 			width: '100%',
 			flex: 1,
+			overflow: 'visible',
 		},
 		menuContent: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
+			paddingHorizontal: metrics.scale(4, 2, 8),
 			paddingTop: metrics.scale(22, 16, 28),
 			paddingBottom: metrics.scale(28, 20, 34),
 			gap: metrics.scale(14, 10, 18),
@@ -860,6 +893,11 @@ const createStyles = (
 			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
 			borderColor: dark ? '#334155' : colors.outline,
+			shadowColor: '#000000',
+			shadowOffset: { width: 0, height: 12 },
+			shadowOpacity: dark ? 0.45 : 0.22,
+			shadowRadius: 28,
+			elevation: dark ? 16 : 12,
 		},
 		heroRow: {
 			flexDirection: 'row',
@@ -923,6 +961,11 @@ const createStyles = (
 			backgroundColor: dark ? '#273449' : colors.surfaceVariant,
 			borderWidth: 1,
 			borderColor: dark ? '#3f4f66' : colors.outline,
+			shadowColor: '#000000',
+			shadowOffset: { width: 0, height: 12 },
+			shadowOpacity: dark ? 0.45 : 0.22,
+			shadowRadius: 28,
+			elevation: dark ? 16 : 12,
 			justifyContent: 'space-between',
 		},
 		statValue: {
@@ -943,6 +986,11 @@ const createStyles = (
 			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
 			borderColor: dark ? '#334155' : colors.outline,
+			shadowColor: '#000000',
+			shadowOffset: { width: 0, height: 12 },
+			shadowOpacity: dark ? 0.45 : 0.22,
+			shadowRadius: 28,
+			elevation: dark ? 16 : 12,
 			gap: metrics.scale(12, 10, 16),
 		},
 		sectionCardDanger: {
@@ -952,6 +1000,11 @@ const createStyles = (
 			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
 			borderColor: dark ? '#334155' : colors.outline,
+			shadowColor: '#000000',
+			shadowOffset: { width: 0, height: 12 },
+			shadowOpacity: dark ? 0.45 : 0.22,
+			shadowRadius: 28,
+			elevation: dark ? 16 : 12,
 			gap: metrics.scale(12, 10, 16),
 		},
 		sectionTitle: {
@@ -999,10 +1052,10 @@ const createStyles = (
 		},
 		modalBackdrop: {
 			flex: 1,
-			backgroundColor: 'rgba(15, 23, 42, 0.45)',
+			backgroundColor: 'rgba(15, 23, 42, 0.55)',
 			justifyContent: 'center',
 			alignItems: 'center',
-			paddingHorizontal: metrics.scale(16, 12, 22),
+			paddingHorizontal: metrics.horizontalPadding,
 		},
 		modalDismissLayer: {
 			...StyleSheet.absoluteFillObject,
@@ -1014,27 +1067,39 @@ const createStyles = (
 		modalCard: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
-			backgroundColor: colors.surface,
+			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
-			borderColor: dark ? '#cfd8e3' : colors.outline,
-			borderRadius: metrics.scale(16, 14, 22),
-			paddingHorizontal: metrics.scale(12, 10, 16),
-			paddingVertical: metrics.scale(12, 10, 16),
-			gap: metrics.scale(6, 4, 8),
+			borderColor: dark ? '#334155' : colors.outline,
+			borderRadius: metrics.scale(24, 18, 30),
+			paddingHorizontal: metrics.scale(18, 16, 24),
+			paddingTop: metrics.scale(18, 16, 22),
+			paddingBottom: metrics.scale(14, 12, 18),
+			gap: metrics.scale(10, 8, 12),
+			shadowColor: '#000000',
+			shadowOffset: { width: 0, height: 12 },
+			shadowOpacity: dark ? 0.45 : 0.22,
+			shadowRadius: 28,
+			elevation: dark ? 16 : 12,
 		},
 		modalCardLarge: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
 			flex: 1,
-			backgroundColor: colors.surface,
+			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
-			borderColor: dark ? '#cfd8e3' : colors.outline,
-			borderRadius: metrics.scale(16, 14, 22),
-			paddingHorizontal: metrics.scale(12, 10, 16),
-			paddingVertical: metrics.scale(12, 10, 16),
-			gap: metrics.scale(6, 4, 8),
+			borderColor: dark ? '#334155' : colors.outline,
+			borderRadius: metrics.scale(24, 18, 30),
+			paddingHorizontal: metrics.scale(18, 16, 24),
+			paddingTop: metrics.scale(18, 16, 22),
+			paddingBottom: metrics.scale(14, 12, 18),
+			gap: metrics.scale(10, 8, 12),
 			maxHeight: metrics.scale(620, 520, 740),
 			overflow: 'hidden',
+			shadowColor: '#000000',
+			shadowOffset: { width: 0, height: 12 },
+			shadowOpacity: dark ? 0.45 : 0.22,
+			shadowRadius: 28,
+			elevation: dark ? 16 : 12,
 		},
 		statisticsScroll: {
 			flex: 1,

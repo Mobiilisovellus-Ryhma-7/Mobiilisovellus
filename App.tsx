@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { StatusBar, View } from 'react-native';
 import AppNavigator from './navigation/AppNavigator';
 import { PaperProvider } from 'react-native-paper';
 import { darkAppTheme, lightAppTheme } from './navigation/theme';
@@ -39,12 +40,18 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <PaperProvider theme={paperTheme as any}>
-        <NavigationContainer theme={navigationTheme}>
-          <AppNavigator
-            isDarkMode={isDarkMode}
-            onToggleDarkMode={() => setIsDarkMode((prev: boolean) => !prev)}
+        <View style={{ flex: 1, backgroundColor: paperTheme.colors.background }}>
+          <StatusBar
+            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+            backgroundColor={paperTheme.colors.background}
           />
-        </NavigationContainer>
+          <NavigationContainer theme={navigationTheme}>
+            <AppNavigator
+              isDarkMode={isDarkMode}
+              onToggleDarkMode={() => setIsDarkMode((prev: boolean) => !prev)}
+            />
+          </NavigationContainer>
+        </View>
       </PaperProvider>
     </SafeAreaProvider>
   );

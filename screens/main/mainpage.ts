@@ -205,7 +205,7 @@ export default function MainPage({
             React.createElement(Text, {
               key: 'hero-subtitle',
               style: [styles.subtitle, { color: colors.onSurfaceVariant }],
-              children: 'Varaa vuorot helposti ja nopeasti !',
+              children: 'Varaa vuorot helposti ja nopeasti!',
             }),
             React.createElement(
               View,
@@ -471,6 +471,11 @@ const createStyles = (
       paddingBottom: metrics.scale(14, 12, 18),
       borderWidth: 1,
       borderColor: dark ? '#334155' : colors.outline,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: dark ? 0.45 : 0.22,
+      shadowRadius: 28,
+      elevation: dark ? 16 : 12,
     },
     modalTitle: {
       fontSize: metrics.scale(22, 18, 28),
