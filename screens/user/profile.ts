@@ -603,11 +603,18 @@ export default function Profile({
 					onRequestClose: closeStatisticsModal,
 				},
 				React.createElement(
-					Pressable,
-					{ style: styles.modalBackdrop, onPress: closeStatisticsModal },
+					View,
+					{ style: styles.modalBackdrop },
+					React.createElement(Pressable, {
+						style: styles.modalDismissLayer,
+						onPress: closeStatisticsModal,
+					}),
 					React.createElement(
-						Pressable,
-						{ style: styles.modalCardLarge, onPress: () => undefined },
+						View,
+						{
+							style: styles.modalCardLarge,
+							pointerEvents: 'box-none',
+						},
 						React.createElement(Text, {
 								style: [styles.modalTitle, styles.modalTitleCentered],
 							children: 'Tilastot',
@@ -660,6 +667,7 @@ export default function Profile({
 							{
 								style: styles.statisticsScroll,
 								contentContainerStyle: styles.statisticsScrollContent,
+								nestedScrollEnabled: true,
 								showsVerticalScrollIndicator: true,
 							},
 							isLoadingBookings
@@ -988,6 +996,9 @@ const createStyles = (
 			alignItems: 'center',
 			paddingHorizontal: metrics.scale(16, 12, 22),
 		},
+		modalDismissLayer: {
+			...StyleSheet.absoluteFillObject,
+		},
 		modalKeyboardWrap: {
 			width: '100%',
 			alignItems: 'center',
@@ -996,6 +1007,8 @@ const createStyles = (
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
 			backgroundColor: colors.surface,
+			borderWidth: 1,
+			borderColor: dark ? '#cfd8e3' : colors.outline,
 			borderRadius: metrics.scale(16, 14, 22),
 			paddingHorizontal: metrics.scale(12, 10, 16),
 			paddingVertical: metrics.scale(12, 10, 16),
@@ -1004,14 +1017,20 @@ const createStyles = (
 		modalCardLarge: {
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
+			flex: 1,
 			backgroundColor: colors.surface,
+			borderWidth: 1,
+			borderColor: dark ? '#cfd8e3' : colors.outline,
 			borderRadius: metrics.scale(16, 14, 22),
 			paddingHorizontal: metrics.scale(12, 10, 16),
 			paddingVertical: metrics.scale(12, 10, 16),
 			gap: metrics.scale(6, 4, 8),
 			maxHeight: metrics.scale(620, 520, 740),
+			overflow: 'hidden',
 		},
 		statisticsScroll: {
+			flex: 1,
+			minHeight: 0,
 			maxHeight: metrics.scale(560, 420, 680),
 		},
 		statisticsScrollContent: {

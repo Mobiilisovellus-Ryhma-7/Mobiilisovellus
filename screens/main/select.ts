@@ -55,7 +55,7 @@ export default function Select({ onBack, onSearch }: SelectProps) {
   const [isSportPickerOpen, setIsSportPickerOpen] = React.useState(false);
   const [isNamePickerOpen, setIsNamePickerOpen] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
-  const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
+  const styles = React.useMemo(() => createStyles(metrics, colors, dark), [colors, dark, metrics]);
   const [searchMode, setSearchMode] = React.useState<SearchMode>('all');
   const [sport, setSport] = React.useState('');
   const [sportOptions, setSportOptions] = React.useState<SportOption[]>([]);
@@ -524,7 +524,8 @@ export default function Select({ onBack, onSearch }: SelectProps) {
 
 const createStyles = (
   metrics: ReturnType<typeof getResponsiveMetrics>,
-  colors: any
+  colors: any,
+  dark: boolean
 ) =>
   StyleSheet.create({
     safeArea: {
@@ -675,6 +676,8 @@ const createStyles = (
     },
     modalCard: {
       backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: '#cfd8e3',
       borderRadius: metrics.scale(24, 18, 30),
       padding: metrics.scale(16, 12, 20),
       gap: metrics.scale(12, 10, 16),
@@ -692,6 +695,8 @@ const createStyles = (
       width: '100%',
       maxWidth: metrics.isTablet ? 460 : 380,
       backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: '#cfd8e3',
       borderRadius: metrics.scale(24, 18, 30),
       padding: metrics.scale(16, 12, 20),
       gap: metrics.scale(12, 10, 16),
