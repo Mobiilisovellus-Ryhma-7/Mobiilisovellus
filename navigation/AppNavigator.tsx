@@ -87,7 +87,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         {({ navigation, route }) => (
           <Search
             onBack={() => navigation.goBack()}
-            onGoHome={() => navigation.navigate('main')}
+            onGoHome={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
             initialSearchMode={route.params?.mode}
             initialSport={route.params?.sport}
             initialName={route.params?.name}
@@ -100,7 +100,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         {({ navigation }) => (
           <Login
             onBack={() => navigation.goBack()}
-            onGoHome={() => navigation.navigate('main')}
+            onGoHome={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
             onForgotPassword={() => navigation.navigate('forgotPassword')}
             onLogin={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
             onRegister={() => navigation.navigate('register')}
@@ -112,7 +112,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         {({ navigation }) => (
           <ForgotPassword
             onBack={() => navigation.goBack()}
-            onGoHome={() => navigation.navigate('main')}
+            onGoHome={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
           />
         )}
       </Stack.Screen>
@@ -121,8 +121,8 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         {({ navigation }) => (
           <Register
             onBack={() => navigation.goBack()}
-            onGoHome={() => navigation.navigate('main')}
-            onRegister={() => navigation.navigate('main')}
+            onGoHome={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
+            onRegister={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
             onGoLogin={() => navigation.navigate('login')}
           />
         )}
@@ -132,7 +132,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         {({ navigation }) => (
           <Profile
             onBack={() => navigation.goBack()}
-            onGoHome={() => navigation.navigate('main')}
+            onGoHome={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
             onSignOut={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
             isDarkMode={isDarkMode}
             onToggleDarkMode={onToggleDarkMode}
