@@ -13,7 +13,7 @@ import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
-import { requestPasswordReset } from '../../services/auth';
+import { usePasswordReset } from '../../hooks';
 
 type ForgotPasswordProps = {
 	onBack?: () => void;
@@ -25,34 +25,7 @@ export default function ForgotPassword({ onBack, onGoHome }: ForgotPasswordProps
 	const { width } = useWindowDimensions();
 	const metrics = getResponsiveMetrics(width);
 	const styles = React.useMemo(() => createStyles(metrics, colors), [colors, metrics]);
-	const [email, setEmail] = React.useState('');
-	const [isSubmitting, setIsSubmitting] = React.useState(false);
-	const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-	const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
-
-	const handleResetPassword = React.useCallback(async () => {
-		const trimmedEmail = email.trim();
-
-		if (!trimmedEmail) {
-			setErrorMessage('Syötä sähköposti.');
-			setSuccessMessage(null);
-			return;
-		}
-
-		setIsSubmitting(true);
-		setErrorMessage(null);
-		setSuccessMessage(null);
-
-		try {
-			await requestPasswordReset(trimmedEmail);
-			setSuccessMessage('Salasanan palautuslinkki lähetetty sähköpostiisi.');
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Palautus epäonnistui.';
-			setErrorMessage(message);
-		} finally {
-			setIsSubmitting(false);
-		}
-	}, [email]);
+	const { email, setEmail, isSubmitting, errorMessage, successMessage, handleResetPassword } = usePasswordReset();
 
 	return React.createElement(
 		Screen,

@@ -51,50 +51,61 @@ export default function MainPage({
       { style: [styles.screen, { backgroundColor: colors.background }] },
       React.createElement(
         Surface,
-        { style: styles.topSection, elevation: 2 },
-        React.createElement(Image, {
-          source: getDynamicSportHallLogoSource(dark),
-          style: styles.logo,
-          resizeMode: 'contain',
-        }),
-        React.createElement(Text, {
-          style: [styles.title, { color: colors.onSurface }],
-          variant: 'displaySmall',
-          children: 'HALLILLE!',
-        }),
-        React.createElement(Text, {
-          style: [styles.subtitle, { color: colors.onSurfaceVariant }],
-          children: 'Varaa vuorot helposti ja nopeasti.',
-        }),
-        React.createElement(
-          View,
-          { style: styles.buttonsWrap },
-          React.createElement(Button, {
-            mode: 'contained',
-            onPress: onOpenFacilities,
-            style: styles.primaryButton,
-            contentStyle: styles.buttonContent,
-            labelStyle: styles.buttonText,
-            children: 'Vapaat kentät',
-          }),
-          !isSignedIn
-            ? React.createElement(Button, {
-                mode: 'contained-tonal',
-                onPress: onOpenLogin,
-                style: styles.secondaryButton,
+        {
+          style: styles.topSection,
+          elevation: 2,
+          children: [
+            React.createElement(Image, {
+              key: 'hero-logo',
+              source: getDynamicSportHallLogoSource(dark),
+              style: styles.logo,
+              resizeMode: 'contain',
+            }),
+            React.createElement(Text, {
+              key: 'hero-title',
+              style: [styles.title, { color: colors.onSurface }],
+              variant: 'displaySmall',
+              children: 'HALLILLE!',
+            }),
+            React.createElement(Text, {
+              key: 'hero-subtitle',
+              style: [styles.subtitle, { color: colors.onSurfaceVariant }],
+              children: 'Varaa vuorot helposti ja nopeasti.',
+            }),
+            React.createElement(
+              View,
+              { key: 'hero-actions', style: styles.buttonsWrap },
+              React.createElement(Button, {
+                mode: 'contained',
+                onPress: onOpenFacilities,
+                style: styles.primaryButton,
                 contentStyle: styles.buttonContent,
-                labelStyle: styles.secondaryButtonText,
-                children: 'Kirjaudu',
-              })
-            : React.createElement(
-                Surface,
-                { style: styles.signedInBadge, elevation: 0 },
-                React.createElement(Text, {
-                  style: styles.signedInText,
-                  children: 'Olet kirjautunut sisään',
-                })
-              )
-        )
+                labelStyle: styles.buttonText,
+                children: 'Vapaat kentät',
+              }),
+              !isSignedIn
+                ? React.createElement(Button, {
+                    mode: 'contained-tonal',
+                    onPress: onOpenLogin,
+                    style: styles.secondaryButton,
+                    contentStyle: styles.buttonContent,
+                    labelStyle: styles.secondaryButtonText,
+                    children: 'Kirjaudu',
+                  })
+                : React.createElement(
+                    Surface,
+                    {
+                      style: styles.signedInBadge,
+                      elevation: 0,
+                      children: React.createElement(Text, {
+                        style: styles.signedInText,
+                        children: 'Olet kirjautunut sisään',
+                      }),
+                    }
+                  )
+            ),
+          ],
+        }
       ),
       React.createElement(
         Pressable,
