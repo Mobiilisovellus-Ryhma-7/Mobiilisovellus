@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
-import { StatusBar, View } from 'react-native';
+import { Platform, StatusBar, View } from 'react-native';
+import Constants from 'expo-constants';
 import AppNavigator from './navigation/AppNavigator';
 import { PaperProvider } from 'react-native-paper';
 import { darkAppTheme, lightAppTheme } from './navigation/theme';
@@ -12,6 +13,7 @@ const SHOW_FIRESTORE_TEST = true;
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = React.useState(false);
+  const isExpoGoIos = Platform.OS === 'ios' && Constants.appOwnership === 'expo';
 
   React.useEffect(() => {
     void initializeNotifications();
@@ -41,10 +43,12 @@ export default function App() {
     <SafeAreaProvider>
       <PaperProvider theme={paperTheme as any}>
         <View style={{ flex: 1, backgroundColor: paperTheme.colors.background }}>
-          <StatusBar
-            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-            backgroundColor={paperTheme.colors.background}
-          />
+          {!isExpoGoIos && (
+            <StatusBar
+              barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+              backgroundColor={paperTheme.colors.background}
+            />
+          )}
           <NavigationContainer theme={navigationTheme}>
             <AppNavigator
               isDarkMode={isDarkMode}
