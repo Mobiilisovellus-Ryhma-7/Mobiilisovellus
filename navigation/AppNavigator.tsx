@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import Constants from 'expo-constants';
 import { onAuthStateChanged } from 'firebase/auth';
 import MainPage from '../screens/main/mainpage';
 import Select from '../screens/main/select';
@@ -38,6 +39,7 @@ type AppNavigatorProps = {
 export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNavigatorProps) {
   const [isSignedIn, setIsSignedIn] = React.useState(false);
   const stackBackgroundColor = isDarkMode ? '#0f172a' : '#ececec';
+  const isExpoGoIos = Platform.OS === 'ios' && Constants.appOwnership === 'expo';
 
   React.useEffect(() => {
     if (!auth) {
@@ -62,7 +64,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
         freezeOnBlur: Platform.OS !== 'android',
         animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
         contentStyle: { backgroundColor: stackBackgroundColor },
-        statusBarStyle: isDarkMode ? 'light' : 'dark',
+        statusBarStyle: isExpoGoIos ? undefined : isDarkMode ? 'light' : 'dark',
       }}
     >
       <Stack.Screen name="main">
