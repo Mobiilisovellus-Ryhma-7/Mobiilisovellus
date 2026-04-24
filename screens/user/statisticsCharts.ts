@@ -176,7 +176,12 @@ function createChartHtml(
 	backgroundColor: string,
 	textColor: string,
 	accentColor: string,
-	secondaryColor: string
+	secondaryColor: string,
+	surfaceVariantColor: string,
+	outlineColor: string,
+	onSurfaceVariantColor: string,
+	errorColor: string,
+	tertiaryColor: string
 ) {
 	const facilityJson = JSON.stringify(
 		facilityData.map((item) => ({
@@ -208,23 +213,24 @@ function createChartHtml(
 <html>
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <style>
 	* { box-sizing: border-box; }
 	body {
 		margin: 0;
-		padding: 6px;
+		padding: 8px;
 		background: ${backgroundColor};
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+		font-family: Roboto, 'Segoe UI', sans-serif;
 	}
 	.chart-wrap {
-		border-radius: 12px;
-		padding: 7px;
-		margin-bottom: 6px;
-		background: rgba(127, 127, 127, 0.12);
+		border-radius: 16px;
+		padding: 12px;
+		margin-bottom: 10px;
+		background: ${surfaceVariantColor};
+		border: 1px solid ${outlineColor};
 	}
 	.chart-title {
-		margin: 0 0 10px;
+		margin: 0 0 12px;
 		font-size: 14px;
 		font-weight: 700;
 		color: ${textColor};
@@ -233,8 +239,8 @@ function createChartHtml(
 		display: block;
 		width: 100%;
 		height: 150px;
-		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.2);
+		border-radius: 12px;
+		background: ${backgroundColor};
 	}
 </style>
 </head>
@@ -291,7 +297,7 @@ function createChartHtml(
 			const top = 16;
 			const bottom = height - 34;
 
-			ctx.strokeStyle = '#8a8a8a';
+			ctx.strokeStyle = '${outlineColor}';
 			ctx.lineWidth = 1;
 			ctx.beginPath();
 			ctx.moveTo(left, top);
@@ -300,7 +306,7 @@ function createChartHtml(
 			ctx.stroke();
 
 			if (!data.length) {
-				ctx.fillStyle = '#7a7a7a';
+				ctx.fillStyle = '${onSurfaceVariantColor}';
 				ctx.font = '13px sans-serif';
 				ctx.fillText('Ei dataa', left + 8, top + 18);
 				return;
@@ -333,7 +339,12 @@ function createChartHtml(
 		}
 
 		function randomColor(index) {
-			const colors = ['${secondaryColor}', '${accentColor}', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6'];
+			const colors = ['${secondaryColor}', '${accentColor}', '${tertiaryColor}', '${errorColor}', '${outlineColor}'];
+			return colors[index % colors.length];
+		}
+
+		function randomTimeColor(index) {
+			const colors = ['${textColor}', '${secondaryColor}', '${outlineColor}', '${accentColor}', '${onSurfaceVariantColor}'];
 			return colors[index % colors.length];
 		}
 
@@ -351,7 +362,7 @@ function createChartHtml(
 			ctx.clearRect(0, 0, width, height);
 
 			if (!data.length) {
-				ctx.fillStyle = '#7a7a7a';
+				ctx.fillStyle = '${onSurfaceVariantColor}';
 				ctx.font = '13px sans-serif';
 				ctx.fillText('Ei dataa', 16, 22);
 				return;
@@ -408,7 +419,7 @@ function createChartHtml(
 
 			const total = data.reduce((sum, item) => sum + item.count, 0);
 			if (total <= 0) {
-				ctx.fillStyle = '#7a7a7a';
+				ctx.fillStyle = '${onSurfaceVariantColor}';
 				ctx.font = '13px sans-serif';
 				ctx.textAlign = 'center';
 				ctx.fillText('Ei dataa', width / 2, height / 2);
@@ -428,7 +439,7 @@ function createChartHtml(
 				ctx.moveTo(centerX, centerY);
 				ctx.arc(centerX, centerY, radius, startAngle, endAngle);
 				ctx.closePath();
-				ctx.fillStyle = randomColor(index);
+				ctx.fillStyle = randomTimeColor(index);
 				ctx.fill();
 				startAngle = endAngle;
 			});
@@ -462,7 +473,7 @@ function createChartHtml(
 				if (body && !document.getElementById('chartErrorText')) {
 					const p = document.createElement('p');
 					p.id = 'chartErrorText';
-					p.style.color = '#b91c1c';
+					p.style.color = '${errorColor}';
 					p.style.font = '600 12px sans-serif';
 					p.textContent = 'Tilastografiikan piirto epaonnistui.';
 					body.appendChild(p);
@@ -500,13 +511,22 @@ export function StatisticsCharts({
 				escapeHtml(colors.surface),
 				escapeHtml(colors.onSurface),
 				escapeHtml(colors.primary),
+				escapeHtml(colors.secondary),
+				escapeHtml(colors.surfaceVariant),
+				escapeHtml(colors.outline),
+				escapeHtml(colors.onSurfaceVariant),
+				escapeHtml(colors.error),
 				escapeHtml(colors.tertiary ?? colors.secondary)
 			),
 		[
+			colors.error,
 			colors.onSurface,
+			colors.onSurfaceVariant,
+			colors.outline,
 			colors.primary,
 			colors.secondary,
 			colors.surface,
+			colors.surfaceVariant,
 			colors.tertiary,
 			facilityData,
 			currentMonthAllUsersSportData,
@@ -523,6 +543,9 @@ export function StatisticsCharts({
 			source: { html },
 			javaScriptEnabled: true,
 			domStorageEnabled: true,
+			scalesPageToFit: false,
+			setBuiltInZoomControls: false,
+			setDisplayZoomControls: false,
 			scrollEnabled: false,
 			nestedScrollEnabled: false,
 			showsVerticalScrollIndicator: false,
@@ -537,8 +560,8 @@ const styles = StyleSheet.create({
 	},
 	webView: {
 		width: '100%',
-		height: 820,
-		minHeight: 820,
+		height: 880,
+		minHeight: 880,
 		backgroundColor: 'transparent',
 	},
 });
