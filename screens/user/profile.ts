@@ -143,108 +143,114 @@ export default function Profile({
 			React.createElement(
 				View,
 				{ style: styles.scrollViewport },
-			React.createElement(
-				ScrollView,
-				{
-					style: styles.menuScroll,
-					contentContainerStyle: styles.menuContent,
-					showsVerticalScrollIndicator: false,
-					bounces: false,
-					alwaysBounceVertical: false,
-					overScrollMode: 'never',
-				},
 				React.createElement(
-					View,
-					{ style: styles.heroCard },
+					ScrollView,
+					{
+						style: styles.menuScroll,
+						contentContainerStyle: styles.menuContent,
+						showsVerticalScrollIndicator: false,
+						bounces: false,
+						alwaysBounceVertical: false,
+						overScrollMode: 'never',
+					},
 					React.createElement(
 						View,
-						{ style: styles.heroRow },
+						{ style: styles.heroCard },
 						React.createElement(
-							Pressable,
-							{
-								style: styles.heroAvatarPressable,
-								onPress: () => void pickProfilePhoto(),
-								disabled: isPickingPhoto,
-							},
+							View,
+							{ style: styles.heroRow },
+							React.createElement(
+								Pressable,
+								{
+									style: styles.heroAvatarPressable,
+									onPress: () => void pickProfilePhoto(),
+									disabled: isPickingPhoto,
+								},
+								React.createElement(
+									View,
+									{ style: [styles.heroAvatar, { backgroundColor: colors.primary }] },
+									profilePhotoUri
+										? React.createElement(Image, {
+											source: { uri: profilePhotoUri },
+											style: styles.heroAvatarImage,
+										})
+										: React.createElement(Text, {
+											style: [styles.heroAvatarText, { color: colors.onPrimary }],
+											children: userInitial,
+										})
+								),
+								React.createElement(Text, {
+									style: [styles.heroAvatarHint, { color: colors.primary }],
+									children: isPickingPhoto ? 'Ladataan...' : 'Vaihda kuva',
+								})
+							),
 							React.createElement(
 								View,
-								{ style: [styles.heroAvatar, { backgroundColor: colors.primary }] },
-								profilePhotoUri
-									? React.createElement(Image, {
-										source: { uri: profilePhotoUri },
-										style: styles.heroAvatarImage,
-									})
-									: React.createElement(Text, {
-										style: [styles.heroAvatarText, { color: colors.onPrimary }],
-										children: userInitial,
-									})
-							),
+								{ style: styles.heroCopy },
+								React.createElement(Text, {
+									style: [styles.heroLabel, { color: colors.onSurfaceVariant }],
+									children: 'Käyttäjätili',
+								}),
+								React.createElement(Text, {
+									style: [styles.heroEmail, { color: colors.onSurface }],
+									children: userEmail,
+								}),
+								React.createElement(Text, {
+									style: [styles.heroSubtext, { color: colors.onSurfaceVariant }],
+									children: 'Hallitse varauksia, tiliä ja sovelluksen ulkoasua.',
+								})
+							)
+						)
+					),
+					React.createElement(
+						View,
+						{ style: styles.statsRow },
+						React.createElement(
+							View,
+							{ style: styles.statCard },
 							React.createElement(Text, {
-								style: [styles.heroAvatarHint, { color: colors.primary }],
-								children: isPickingPhoto ? 'Ladataan...' : 'Vaihda kuva',
+								style: [styles.statValue, { color: colors.onSurface }],
+								children: `${activeBookings.length}`,
+							}),
+							React.createElement(Text, {
+								style: [styles.statLabel, { color: colors.onSurfaceVariant }],
+								children: 'Aktiiviset varaukset',
 							})
 						),
 						React.createElement(
 							View,
-							{ style: styles.heroCopy },
+							{ style: styles.statCard },
 							React.createElement(Text, {
-								style: [styles.heroLabel, { color: colors.onSurfaceVariant }],
-								children: 'Käyttäjätili',
+								style: [styles.statValue, { color: colors.onSurface }],
+								children: `${bookingHistory.length}`,
 							}),
 							React.createElement(Text, {
-								style: [styles.heroEmail, { color: colors.onSurface }],
-								children: userEmail,
+								style: [styles.statLabel, { color: colors.onSurfaceVariant }],
+								numberOfLines: 1,
+								adjustsFontSizeToFit: true,
+								minimumFontScale: 0.82,
+								children: 'Varaushistoria',
+							})
+						),
+						React.createElement(
+							Pressable,
+							{
+								style: ({ pressed }) => [styles.statCard, pressed ? styles.statCardPressed : null],
+								onPress: onToggleDarkMode,
+								accessibilityRole: 'switch',
+								accessibilityState: { checked: isDarkMode },
+								accessibilityLabel: `Pimeä tila ${isDarkMode ? 'päällä' : 'pois'}`,
+							},
+							React.createElement(Text, {
+								style: [styles.statValue, { color: colors.onSurface }],
+								children: isDarkMode ? 'Päällä' : 'Pois',
 							}),
 							React.createElement(Text, {
-								style: [styles.heroSubtext, { color: colors.onSurfaceVariant }],
-								children: 'Hallitse varauksia, tiliä ja sovelluksen ulkoasua.',
+								style: [styles.statLabel, { color: colors.onSurfaceVariant }],
+								children: 'Pimeä tila',
 							})
 						)
-					)
-				),
-				React.createElement(
-					View,
-					{ style: styles.statsRow },
-					React.createElement(
-						View,
-						{ style: styles.statCard },
-						React.createElement(Text, {
-							style: [styles.statValue, { color: colors.onSurface }],
-							children: `${activeBookings.length}`,
-						}),
-						React.createElement(Text, {
-							style: [styles.statLabel, { color: colors.onSurfaceVariant }],
-							children: 'Aktiiviset varaukset',
-						})
 					),
-					React.createElement(
-						View,
-						{ style: styles.statCard },
-						React.createElement(Text, {
-							style: [styles.statValue, { color: colors.onSurface }],
-							children: `${bookingHistory.length}`,
-						}),
-						React.createElement(Text, {
-							style: [styles.statLabel, { color: colors.onSurfaceVariant }],
-							numberOfLines: 1,
-							adjustsFontSizeToFit: true,
-							minimumFontScale: 0.82,
-							children: 'Varaushistoria',
-						})
-					),
-					React.createElement(
-						View,
-						{ style: styles.statCard },
-						React.createElement(Text, {
-							style: [styles.statValue, { color: colors.onSurface }],
-							children: isDarkMode ? 'Päällä' : 'Pois',
-						}),
-						React.createElement(Text, {
-							style: [styles.statLabel, { color: colors.onSurfaceVariant }],
-							children: 'Pimeä tila',
-						})
-					)
-				),
 				React.createElement(
 					View,
 					{ style: styles.sectionCard },
@@ -270,14 +276,6 @@ export default function Profile({
 							contentStyle: styles.actionButtonContent,
 							labelStyle: styles.actionButtonLabel,
 							children: 'Varaushistoria',
-						}),
-						React.createElement(Button, {
-							mode: 'contained-tonal',
-							onPress: onToggleDarkMode,
-							style: styles.actionButton,
-							contentStyle: styles.actionButtonContent,
-							labelStyle: styles.actionButtonLabel,
-							children: isDarkMode ? 'Pimeä tila: Päällä' : 'Pimeä tila: Pois',
 						}),
 						React.createElement(Button, {
 							mode: 'elevated',
@@ -664,7 +662,7 @@ export default function Profile({
 								React.createElement(Text, {
 									style: [
 										styles.trainingSummaryValue,
-										{ color: trainingSummary.monthDeltaPercent < 0 ? '#b91c1c' : '#0f766e' },
+										{ color: trainingSummary.monthDeltaPercent < 0 ? colors.error : colors.primary },
 									],
 									children: trainingSummary.monthDeltaText,
 								})
@@ -688,7 +686,7 @@ export default function Profile({
 								style: styles.statisticsScroll,
 								contentContainerStyle: styles.statisticsScrollContent,
 								nestedScrollEnabled: true,
-								showsVerticalScrollIndicator: true,
+								showsVerticalScrollIndicator: false,
 							},
 							isLoadingBookings
 								? React.createElement(Text, {
@@ -893,7 +891,7 @@ const createStyles = (
 			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
 			borderColor: dark ? '#334155' : colors.outline,
-			shadowColor: '#aaaaaa',
+			shadowColor: '#4c6183',
 			shadowOffset: { width: 0, height: 12 },
 			shadowOpacity: dark ? 0.45 : 0.22,
 			shadowRadius: 28,
@@ -961,12 +959,16 @@ const createStyles = (
 			backgroundColor: dark ? '#273449' : colors.surfaceVariant,
 			borderWidth: 1,
 			borderColor: dark ? '#3f4f66' : colors.outline,
-			shadowColor: '#aaaaaa',
+			shadowColor: '#4c6183',
 			shadowOffset: { width: 0, height: 12 },
 			shadowOpacity: dark ? 0.45 : 0.22,
 			shadowRadius: 28,
 			elevation: dark ? 16 : 12,
 			justifyContent: 'space-between',
+		},
+		statCardPressed: {
+			opacity: 0.85,
+			transform: [{ scale: 0.98 }],
 		},
 		statValue: {
 			fontSize: metrics.scale(20, 17, 24),
@@ -986,7 +988,7 @@ const createStyles = (
 			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
 			borderColor: dark ? '#334155' : colors.outline,
-			shadowColor: '#aaaaaa',
+			shadowColor: '#4c6183',
 			shadowOffset: { width: 0, height: 12 },
 			shadowOpacity: dark ? 0.45 : 0.22,
 			shadowRadius: 28,
@@ -1000,7 +1002,7 @@ const createStyles = (
 			backgroundColor: dark ? '#1e293b' : colors.surface,
 			borderWidth: 1,
 			borderColor: dark ? '#334155' : colors.outline,
-			shadowColor: '#aaaaaa',
+			shadowColor: '#4c6183',
 			shadowOffset: { width: 0, height: 12 },
 			shadowOpacity: dark ? 0.45 : 0.22,
 			shadowRadius: 28,
@@ -1052,7 +1054,7 @@ const createStyles = (
 		},
 		modalBackdrop: {
 			flex: 1,
-			backgroundColor: 'rgba(15, 23, 42, 0.55)',
+			backgroundColor: 'rgba(28, 27, 31, 0.45)',
 			justifyContent: 'center',
 			alignItems: 'center',
 			paddingHorizontal: metrics.horizontalPadding,
@@ -1085,9 +1087,9 @@ const createStyles = (
 			width: '100%',
 			maxWidth: metrics.contentMaxWidth,
 			flex: 1,
-			backgroundColor: dark ? '#1e293b' : colors.surface,
+			backgroundColor: colors.surfaceContainerHigh ?? colors.surface,
 			borderWidth: 1,
-			borderColor: dark ? '#334155' : colors.outline,
+			borderColor: colors.outlineVariant ?? colors.outline,
 			borderRadius: metrics.scale(24, 18, 30),
 			paddingHorizontal: metrics.scale(18, 16, 24),
 			paddingTop: metrics.scale(18, 16, 22),

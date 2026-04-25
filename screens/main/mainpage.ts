@@ -8,12 +8,11 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { Button, Icon, Surface, Text, useTheme } from 'react-native-paper';
+import { Button, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 import { getResponsiveMetrics } from '../shared/responsive';
 import { getDynamicSportHallLogoSource } from '../shared/logo';
 import Screen from '../shared/Screen';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import {
   auth,
   db,
@@ -39,7 +38,6 @@ export default function MainPage({
   const metrics = getResponsiveMetrics(width);
   const styles = React.useMemo(() => createStyles(metrics, colors, dark), [colors, dark, metrics]);
   const [isSignedIn, setIsSignedIn] = React.useState(false);
-  const [profilePhotoUri, setProfilePhotoUri] = React.useState<string | null>(null);
   const [showBookingsModal, setShowBookingsModal] = React.useState(false);
   const [isLoadingBookings, setIsLoadingBookings] = React.useState(false);
   const [bookingsError, setBookingsError] = React.useState<string | null>(null);
@@ -55,7 +53,6 @@ export default function MainPage({
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsSignedIn(!!user);
       if (!user) {
-        setProfilePhotoUri(null);
         setShowBookingsModal(false);
         setBookingsError(null);
         setUserBookings([]);
@@ -65,40 +62,6 @@ export default function MainPage({
 
     return unsubscribe;
   }, []);
-
-  React.useEffect(() => {
-    const userId = auth?.currentUser?.uid;
-    if (!isSignedIn || !userId || !db) {
-      setProfilePhotoUri(null);
-      return;
-    }
-
-    let isActive = true;
-
-    getDoc(doc(db, 'users', userId))
-      .then((snapshot) => {
-        if (!isActive || !snapshot.exists()) {
-          return;
-        }
-
-        const data = snapshot.data() as { profilePhotoUri?: unknown };
-        if (typeof data.profilePhotoUri === 'string' && data.profilePhotoUri.trim()) {
-          setProfilePhotoUri(data.profilePhotoUri.trim());
-          return;
-        }
-
-        setProfilePhotoUri(null);
-      })
-      .catch(() => {
-        if (isActive) {
-          setProfilePhotoUri(null);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [isSignedIn]);
 
   const activeBookings = React.useMemo(
     () => {
@@ -239,28 +202,19 @@ export default function MainPage({
           ],
         }
       ),
-      isSignedIn
-        ? React.createElement(
-            Pressable,
-            {
-              onPress: onOpenProfile,
-              style: styles.profileIconButton,
-              accessibilityRole: 'button',
-              accessibilityLabel: 'Avaa profiili',
-            },
-            profilePhotoUri
-              ? React.createElement(Image, {
-                  source: { uri: profilePhotoUri },
-                  style: styles.profileImage,
-                })
-              : React.createElement(Icon, {
-                  source: 'account',
-                  size: metrics.scale(26, 22, 30),
-                  color: colors.onSurface,
-                })
-          )
-        : null
-      ,
+      React.createElement(
+        IconButton,
+        {
+          icon: 'account-circle',
+          mode: 'contained-tonal',
+          size: metrics.scale(34, 28, 40),
+          onPress: onOpenProfile,
+          style: styles.profileIconButton,
+          iconColor: colors.onSecondaryContainer,
+          containerColor: colors.secondaryContainer,
+          accessibilityLabel: 'Avaa profiili',
+        }
+      ),
       React.createElement(
         Modal,
         {
@@ -371,11 +325,11 @@ const createStyles = (
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: '#ececec',
+      backgroundColor: colors.background,
     },
     screen: {
       flex: 1,
-      backgroundColor: '#ececec',
+      backgroundColor: colors.background,
       justifyContent: 'space-between',
       paddingHorizontal: metrics.horizontalPadding,
       paddingTop: metrics.scale(48, 28, 64),
@@ -386,12 +340,12 @@ const createStyles = (
       width: '100%',
       maxWidth: metrics.contentMaxWidth,
       alignItems: 'center',
-      backgroundColor: dark ? '#1e293b' : colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: metrics.scale(28, 20, 34),
       paddingHorizontal: metrics.scale(20, 14, 28),
       paddingVertical: metrics.scale(20, 14, 30),
       borderWidth: 1,
-      borderColor: dark ? '#334155' : colors.outline,
+      borderColor: colors.outline,
     },
     logo: {
       width: metrics.scale(132, 100, 150),
@@ -464,13 +418,13 @@ const createStyles = (
       width: '100%',
       maxWidth: metrics.contentMaxWidth,
       maxHeight: '80%',
-      backgroundColor: dark ? '#1e293b' : colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: metrics.scale(24, 18, 30),
       paddingHorizontal: metrics.scale(18, 16, 24),
       paddingTop: metrics.scale(18, 16, 22),
       paddingBottom: metrics.scale(14, 12, 18),
       borderWidth: 1,
-      borderColor: dark ? '#334155' : colors.outline,
+      borderColor: colors.outline,
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 12 },
       shadowOpacity: dark ? 0.45 : 0.22,
@@ -550,16 +504,6 @@ const createStyles = (
       width: metrics.scale(66, 58, 74),
       height: metrics.scale(66, 58, 74),
       borderRadius: metrics.scale(33, 29, 37),
-      alignSelf: 'flex-end',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: dark ? '#1e293b' : colors.surface,
-      borderWidth: 1,
-      borderColor: dark ? '#334155' : colors.outline,
-    },
-    profileImage: {
-      width: metrics.scale(62, 54, 70),
-      height: metrics.scale(62, 54, 70),
-      borderRadius: metrics.scale(31, 27, 35),
+      alignSelf: 'center',
     },
   });
