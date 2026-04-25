@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -17,6 +18,7 @@ import {
   auth,
   db,
   Booking,
+  deleteBookingForUser,
   FacilitySection,
   getBookingsForUserId,
   listFacilitySections,
@@ -40,6 +42,7 @@ export default function MainPage({
   const [isSignedIn, setIsSignedIn] = React.useState(false);
   const [showBookingsModal, setShowBookingsModal] = React.useState(false);
   const [isLoadingBookings, setIsLoadingBookings] = React.useState(false);
+  const [deletingBookingId, setDeletingBookingId] = React.useState<string | null>(null);
   const [bookingsError, setBookingsError] = React.useState<string | null>(null);
   const [userBookings, setUserBookings] = React.useState<Booking[]>([]);
   const [facilitySectionsById, setFacilitySectionsById] = React.useState<Record<string, FacilitySection>>({});
@@ -97,16 +100,14 @@ export default function MainPage({
     return `${match[3]}.${match[2]}.${match[1]}`;
   }, []);
 
-  const openBookingsModal = React.useCallback(async () => {
+  const loadUserBookings = React.useCallback(async () => {
     const userId = auth?.currentUser?.uid;
 
     if (!userId || !db) {
       setBookingsError('Kirjaudu sisaan nahdaksesi varauksesi.');
-      setShowBookingsModal(true);
       return;
     }
 
-    setShowBookingsModal(true);
     setIsLoadingBookings(true);
     setBookingsError(null);
 
@@ -133,13 +134,52 @@ export default function MainPage({
     }
   }, []);
 
+  const confirmDeleteBooking = React.useCallback(async (bookingId: string) => {
+    const userId = auth?.currentUser?.uid;
+
+    if (!userId) {
+      setBookingsError('Kirjaudu sisaan poistaaksesi varauksen.');
+      return;
+    }
+
+    setDeletingBookingId(bookingId);
+    setBookingsError(null);
+
+    try {
+      await deleteBookingForUser(bookingId, userId);
+      await loadUserBookings();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Varauksen poistaminen epaonnistui.';
+      setBookingsError(message);
+    } finally {
+      setDeletingBookingId(null);
+    }
+  }, [loadUserBookings]);
+
+  const handleDeleteBooking = React.useCallback((bookingId: string) => {
+    Alert.alert(
+      'Oletko varma?',
+      'Tämä poistaa varauksen pysyvästi',
+      [
+        { text: 'Peruuta', style: 'cancel' },
+        { text: 'Kyllä', style: 'destructive', onPress: () => void confirmDeleteBooking(bookingId) },
+      ],
+      { cancelable: true }
+    );
+  }, [confirmDeleteBooking]);
+
+  const openBookingsModal = React.useCallback(async () => {
+    setShowBookingsModal(true);
+    await loadUserBookings();
+  }, [loadUserBookings]);
+
   const closeBookingsModal = React.useCallback(() => {
-    if (isLoadingBookings) {
+    if (isLoadingBookings || !!deletingBookingId) {
       return;
     }
 
     setShowBookingsModal(false);
-  }, [isLoadingBookings]);
+  }, [deletingBookingId, isLoadingBookings]);
 // Pääsivu
   return React.createElement(
     Screen,
@@ -292,10 +332,26 @@ export default function MainPage({
                         style: styles.bookingMeta,
                         children: `${booking.slotStart}-${booking.slotEnd}`,
                       }),
-                      React.createElement(Text, {
-                        style: styles.bookingStatus,
-                        children: booking.status,
-                      })
+                      React.createElement(
+                        View,
+                        { style: styles.bookingFooterRow },
+                        React.createElement(
+                          Pressable,
+                          {
+                            style: [
+                              styles.bookingCancelAction,
+                              deletingBookingId === booking.id ? styles.bookingCancelActionDisabled : null,
+                            ],
+                            onPress: () => void handleDeleteBooking(booking.id),
+                            disabled: !!deletingBookingId,
+                            accessibilityRole: 'button',
+                          },
+                          React.createElement(Text, {
+                            style: styles.bookingCancelActionText,
+                            children: deletingBookingId === booking.id ? 'Poistetaan...' : 'Peruuta',
+                          })
+                        )
+                      )
                     );
                   })
                 )
@@ -306,7 +362,7 @@ export default function MainPage({
               React.createElement(Button, {
                 mode: 'contained',
                 onPress: closeBookingsModal,
-                disabled: isLoadingBookings,
+                disabled: isLoadingBookings || !!deletingBookingId,
                 children: 'Sulje',
               })
             )
@@ -490,11 +546,26 @@ const createStyles = (
       color: colors.onSurface,
       fontWeight: '700',
     },
-    bookingStatus: {
-      fontSize: metrics.scale(12, 10, 14),
-      color: colors.primary,
+    bookingFooterRow: {
+      marginTop: metrics.scale(1, 0, 2),
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: metrics.scale(8, 6, 10),
+    },
+    bookingCancelAction: {
+      paddingHorizontal: metrics.scale(4, 2, 6),
+      paddingVertical: metrics.scale(1, 0, 2),
+      borderRadius: metrics.scale(6, 4, 8),
+      alignSelf: 'flex-end',
+    },
+    bookingCancelActionDisabled: {
+      opacity: 0.6,
+    },
+    bookingCancelActionText: {
+      fontSize: metrics.scale(10, 9, 12),
       fontWeight: '700',
-      textTransform: 'capitalize',
+      color: '#b91c1c',
     },
     modalActions: {
       marginTop: metrics.scale(12, 10, 14),
