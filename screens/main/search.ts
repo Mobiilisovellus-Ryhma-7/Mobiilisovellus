@@ -4,7 +4,6 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   LayoutChangeEvent,
@@ -19,8 +18,6 @@ import {
 import {
   Button,
   Chip,
-  Dialog,
-  Portal,
   Text,
   useTheme,
 } from 'react-native-paper';
@@ -48,6 +45,7 @@ import { buildDailyTimeSlots, formatDateKey, TimeSlot } from '../../utils/timesl
 type SearchProps = {
   onBack?: () => void;
   onGoHome?: () => void;
+  onGoLogin?: () => void;
   initialSearchMode?: SearchMode;
   initialSport?: string;
   initialName?: string;
@@ -215,6 +213,7 @@ async function fetchTileDataUri(tileUrl: string): Promise<string> {
 export default function Search({
   onBack,
   onGoHome,
+  onGoLogin,
   initialSearchMode,
   initialSport,
   initialName,
@@ -252,6 +251,11 @@ export default function Search({
   const [isSubmittingBooking, setIsSubmittingBooking] = React.useState(false);
   const [bookingFeedback, setBookingFeedback] = React.useState<string | null>(null);
   const [bookingError, setBookingError] = React.useState<string | null>(null);
+  const [selectedSectionSnapshot, setSelectedSectionSnapshot] = React.useState<FacilitySection | null>(null);
+  const [isLoginRequiredModalOpen, setIsLoginRequiredModalOpen] = React.useState(false);
+  const [loginRequiredMessage, setLoginRequiredMessage] = React.useState('Kirjaudu sisään varataksesi vuoron');
+  const [reservationToRestore, setReservationToRestore] = React.useState<FacilitySection | null>(null);
+  const [shouldRestoreReservationAfterLogin, setShouldRestoreReservationAfterLogin] = React.useState(false);
   const [pendingBookingSlot, setPendingBookingSlot] = React.useState<TimeSlot | null>(null);
   const hasBootstrappedList = React.useRef(false);
   const hasAppliedInitialFilters = React.useRef(false);
@@ -465,6 +469,26 @@ export default function Search({
   }, [loadFavoriteFacilities]);
 
   React.useEffect(() => {
+    if (!currentUserId || !shouldRestoreReservationAfterLogin || !reservationToRestore) {
+      return;
+    }
+
+    setSelectedSection(reservationToRestore);
+    setShouldRestoreReservationAfterLogin(false);
+    setReservationToRestore(null);
+  }, [currentUserId, reservationToRestore, shouldRestoreReservationAfterLogin]);
+
+  React.useEffect(() => {
+    if (!selectedSection) {
+      return;
+    }
+
+    setSelectedSectionSnapshot(selectedSection);
+  }, [selectedSection]);
+
+  const visibleSection = selectedSection ?? selectedSectionSnapshot;
+
+  React.useEffect(() => {
     let isActive = true;
 
     listFacilitySections()
@@ -671,7 +695,8 @@ export default function Search({
 
   const toggleFavoritesFilter = React.useCallback(() => {
     if (!currentUserId) {
-      Alert.alert('Kirjaudu sisään', 'Sinun tulee kirjautua sisään ennen suosikkien tarkastelua.');
+      setLoginRequiredMessage('Sinun tulee kirjautua sisään ennen suosikkien tarkastelua.');
+      setIsLoginRequiredModalOpen(true);
       return;
     }
 
@@ -696,6 +721,17 @@ export default function Search({
     setActiveDateFilter(nextDateFilter);
     return nextDateFilter;
   }, []);
+
+  const shiftBookingDate = React.useCallback((dayDelta: number) => {
+    const baseDate = activeDateFilter ? parseDateKeyToDate(activeDateFilter) ?? selectedDate : selectedDate;
+    const nextDate = new Date(baseDate);
+    nextDate.setHours(0, 0, 0, 0);
+    nextDate.setDate(nextDate.getDate() + dayDelta);
+
+    setSelectedDate(nextDate);
+    const nextDateFilter = applyDateFilter(nextDate);
+    void runSearch(undefined, undefined, undefined, undefined, nextDateFilter);
+  }, [activeDateFilter, applyDateFilter, runSearch, selectedDate]);
 
   const loadSelectedSectionBookings = React.useCallback(async (sectionId: string) => {
     const bookings = await getBookingsForSectionOnDate(sectionId, bookingDate, ['confirmed']);
@@ -754,7 +790,8 @@ export default function Search({
 
       const userId = auth?.currentUser?.uid;
       if (!userId) {
-        setBookingError('Kirjaudu sisään varataksesi vuoron.');
+        setLoginRequiredMessage('Kirjaudu sisään varataksesi vuoron');
+        setIsLoginRequiredModalOpen(true);
         return;
       }
 
@@ -810,7 +847,7 @@ export default function Search({
     return todaySlots.map((slot) => {
       const isBooked = bookedSet.has(slot.key);
       const disabled = isBooked || slot.isPast || isSubmittingBooking;
-      const statusLabel = isBooked ? 'Varattu' : slot.isPast ? 'Mennyt' : 'Vapaa';
+      const statusLabel = isBooked ? 'Varattu' : slot.isPast ? 'Mennyt ajankohta' : 'Vapaa';
 
       return React.createElement(
         Pressable,
@@ -939,7 +976,8 @@ export default function Search({
 
       if (!currentUserId) {
         setErrorMessage(null);
-        Alert.alert('Kirjaudu sisään', 'Sinun tulee kirjautua sisään ennen suosikkien lisäämistä.');
+        setLoginRequiredMessage('Sinun tulee kirjautua sisään ennen suosikkien lisäämistä.');
+        setIsLoginRequiredModalOpen(true);
         return;
       }
 
@@ -1289,6 +1327,29 @@ export default function Search({
         ),
       ),
       React.createElement(
+        React.Fragment,
+        null,
+        isDatePickerVisible
+          ? React.createElement(DateTimePicker, {
+              value: selectedDate,
+              mode: 'date',
+              locale: 'fi-FI',
+              display: Platform.OS === 'ios' ? 'inline' : 'calendar',
+              themeVariant: dark ? 'dark' : 'light',
+              onChange: (event: DateTimePickerEvent, date?: Date) => {
+                if (!date || event.type === 'dismissed') {
+                  setIsDatePickerVisible(false);
+                  return;
+                }
+
+                setSelectedDate(date);
+                const nextDateFilter = applyDateFilter(date);
+                void runSearch(undefined, undefined, undefined, undefined, nextDateFilter);
+                setIsDatePickerVisible(false);
+              },
+            })
+          : null,
+        React.createElement(
         View,
         {
           style: styles.listSurface,
@@ -1321,6 +1382,57 @@ export default function Search({
             ...slotRows
           ),
         }
+      )
+      ),
+      React.createElement(
+        Modal,
+        {
+          visible: isLoginRequiredModalOpen,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setIsLoginRequiredModalOpen(false),
+        },
+        React.createElement(
+          Pressable,
+          {
+            style: styles.modalBackdrop,
+            onPress: () => setIsLoginRequiredModalOpen(false),
+          },
+          React.createElement(
+            Pressable,
+            {
+              style: styles.modalPickerCard,
+              onPress: () => undefined,
+            },
+            React.createElement(Text, {
+              style: styles.modalPickerTitle,
+              children: loginRequiredMessage,
+            }),
+            React.createElement(
+              View,
+              { style: styles.modalPickerActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsLoginRequiredModalOpen(false),
+                children: 'sulje',
+              }),
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => {
+                  if (selectedSection) {
+                    setReservationToRestore(selectedSection);
+                    setShouldRestoreReservationAfterLogin(true);
+                  }
+
+                  setIsLoginRequiredModalOpen(false);
+                  setSelectedSection(null);
+                  onGoLogin?.();
+                },
+                children: 'kirjaudu sisään',
+              })
+            )
+          )
+        )
       ),
       React.createElement(
         Modal,
@@ -1469,260 +1581,229 @@ export default function Search({
       React.createElement(
         Modal,
         {
-          visible: isDatePickerVisible,
+          visible: !!selectedSection,
           transparent: true,
           animationType: 'fade',
-          onRequestClose: () => setIsDatePickerVisible(false),
+          onRequestClose: () => setSelectedSection(null),
         },
         React.createElement(
-          Pressable,
+          View,
           {
             style: styles.modalBackdrop,
-            onPress: () => setIsDatePickerVisible(false),
           },
+          React.createElement(Pressable, {
+            style: styles.modalDismissLayer,
+            onPress: () => setSelectedSection(null),
+          }),
           React.createElement(
-            Pressable,
+            View,
             {
-              style: styles.modalPickerCard,
-              onPress: () => undefined,
+              style: styles.dialog,
             },
-            React.createElement(Text, {
-              style: styles.modalPickerTitle,
-              children: 'Valitse päivämäärä',
-            }),
-            React.createElement(DateTimePicker, {
-              value: selectedDate,
-              mode: 'date',
-              locale: 'fi-FI',
-              display: Platform.OS === 'ios' ? 'inline' : 'calendar',
-              themeVariant: dark ? 'dark' : 'light',
-              onChange: (event: DateTimePickerEvent, date?: Date) => {
-                if (!date || event.type === 'dismissed') {
-                  setIsDatePickerVisible(false);
-                  return;
-                }
-
-                setSelectedDate(date);
-                const nextDateFilter = applyDateFilter(date);
-                void runSearch(undefined, undefined, undefined, undefined, nextDateFilter);
-                setIsDatePickerVisible(false);
-              },
-            }),
             React.createElement(
               View,
-              { style: styles.modalPickerActions },
+              { style: styles.modalCard },
+              React.createElement(
+                View,
+                { style: styles.modalTopRow },
+                React.createElement(Text, {
+                  style: styles.modalHall,
+                  children: visibleSection ? getFacilityName(visibleSection) : '-',
+                }),
+                React.createElement(
+                  View,
+                  { style: styles.modalTopActions },
+                  React.createElement(
+                    Pressable,
+                    {
+                      style: [
+                        styles.favoriteButton,
+                        visibleSection &&
+                        isSyncingFavoriteFacilityId === normalizeFacilityKey(visibleSection.facilityId)
+                          ? styles.favoriteButtonDisabled
+                          : null,
+                      ],
+                      onPress: () => {
+                        if (visibleSection) {
+                          void toggleFavoriteForSection(visibleSection);
+                        }
+                      },
+                    },
+                    React.createElement(Text, {
+                      style: [
+                        styles.favoriteButtonText,
+                        visibleSection && isFacilityFavorite(visibleSection)
+                          ? styles.favoriteButtonTextActive
+                          : null,
+                      ],
+                      children:
+                        visibleSection && isFacilityFavorite(visibleSection) ? '★' : '☆',
+                    })
+                  ),
+                  React.createElement(Text, {
+                    style: styles.modalTime,
+                    children: visibleSection?.isBooked ? 'Varattu' : null,
+                  })
+                )
+              ),
+              React.createElement(Text, {
+                style: styles.modalSubLine,
+                children: visibleSection ? getSportAndFieldLabel(visibleSection) : '-',
+              }),
+              React.createElement(
+                Pressable,
+                {
+                  style: styles.mapPlaceholder,
+                  onPress: () => void openInMaps(),
+                  onLayout: onMapViewportLayout,
+                },
+                mapPreview
+                  ? React.createElement(
+                      View,
+                      {
+                        style: [
+                          styles.mapCanvas,
+                          {
+                            left: mapCanvasOffset.left,
+                            top: mapCanvasOffset.top,
+                          },
+                        ],
+                      },
+                      ...mapPreview.tiles.map((tile) =>
+                        React.createElement(Image, {
+                          key: tile.key,
+                          source: {
+                            uri: tile.uri,
+                          },
+                          style: [styles.mapTile, { left: tile.left, top: tile.top }],
+                          resizeMode: 'cover',
+                        })
+                      )
+                    )
+                  : React.createElement(Text, {
+                      style: styles.mapPin,
+                      children: 'Karttaa ladataan...',
+                    }),
+                mapPreview
+                  ? React.createElement(View, {
+                      style: [
+                        styles.mapDot,
+                        {
+                          left: '50%',
+                          top: '50%',
+                        },
+                      ],
+                    })
+                  : null
+              ),
+              React.createElement(Text, {
+                style: styles.modalSubLine,
+                children: `Osoite: ${visibleSection ? getFacilityAddress(visibleSection) ?? 'Ei saatavilla' : '-'}`,
+              }),
+              React.createElement(Text, {
+                style: styles.modalSubLine,
+                children: `Kuvaus: ${visibleSection?.description ?? 'Ei kuvausta'}`,
+              }),
+              bookingError
+                ? React.createElement(Text, {
+                    style: styles.bookingErrorText,
+                    children: bookingError,
+                  })
+                : null,
+              bookingFeedback
+                ? React.createElement(Text, {
+                    style: styles.bookingFeedbackText,
+                    children: bookingFeedback,
+                  })
+                : null,
+              React.createElement(
+                View,
+                { style: styles.slotsContainer },
+                React.createElement(Text, {
+                  style: styles.slotsTitle,
+                  children: slotsTitle,
+                }),
+                React.createElement(
+                  View,
+                  { style: styles.slotsDayActions },
+                  React.createElement(Button, {
+                    mode: 'text',
+                    onPress: () => shiftBookingDate(-1),
+                    children: 'edellinen päivä',
+                  }),
+                  React.createElement(Button, {
+                    mode: 'text',
+                    onPress: () => shiftBookingDate(1),
+                    children: 'seruaava päivä',
+                  })
+                ),
+                isLoadingSlots
+                  ? React.createElement(ActivityIndicator, {
+                      size: 'small',
+                      style: styles.slotLoader,
+                    })
+                  : React.createElement(
+                      ScrollView,
+                      {
+                        style: styles.slotBookingList,
+                        contentContainerStyle: styles.slotBookingListContent,
+                      },
+                      ...selectedSectionSlotRows
+                    )
+              ),
               React.createElement(Button, {
                 mode: 'text',
-                onPress: () => setIsDatePickerVisible(false),
+                style: styles.closeBookingModalButton,
+                onPress: () => setSelectedSection(null),
                 children: 'Sulje',
               })
             )
           )
         )
       ),
-      React.createElement(Portal, {
-        children: React.createElement(
-          React.Fragment,
-          null,
+      React.createElement(
+        Modal,
+        {
+          visible: !!pendingBookingSlot,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => setPendingBookingSlot(null),
+        },
+        React.createElement(
+          View,
+          { style: styles.modalBackdrop },
+          React.createElement(Pressable, {
+            style: styles.modalDismissLayer,
+            onPress: () => setPendingBookingSlot(null),
+          }),
           React.createElement(
-            Dialog,
-            {
-              visible: !!selectedSection,
-              onDismiss: () => setSelectedSection(null),
-              style: styles.dialog,
-              children: React.createElement(
-                View,
-                { style: styles.modalCard },
-                React.createElement(
-                  View,
-                  { style: styles.modalTopRow },
-                  React.createElement(Text, {
-                    style: styles.modalHall,
-                    children: selectedSection ? getFacilityName(selectedSection) : '-',
-                  }),
-                  React.createElement(
-                    View,
-                    { style: styles.modalTopActions },
-                    React.createElement(
-                      Pressable,
-                      {
-                        style: [
-                          styles.favoriteButton,
-                          selectedSection &&
-                          isSyncingFavoriteFacilityId === normalizeFacilityKey(selectedSection.facilityId)
-                            ? styles.favoriteButtonDisabled
-                            : null,
-                        ],
-                        onPress: () => {
-                          if (selectedSection) {
-                            void toggleFavoriteForSection(selectedSection);
-                          }
-                        },
-                      },
-                      React.createElement(Text, {
-                        style: [
-                          styles.favoriteButtonText,
-                          selectedSection && isFacilityFavorite(selectedSection)
-                            ? styles.favoriteButtonTextActive
-                            : null,
-                        ],
-                        children:
-                          selectedSection && isFacilityFavorite(selectedSection) ? '★' : '☆',
-                      })
-                    ),
-                    React.createElement(Text, {
-                      style: styles.modalTime,
-                      children: selectedSection?.isBooked ? 'Varattu' : null,
-                    })
-                  )
-                ),
-                React.createElement(Text, {
-                  style: styles.modalSubLine,
-                  children: selectedSection ? getSportAndFieldLabel(selectedSection) : '-',
-                }),
-                React.createElement(
-                  Pressable,
-                  {
-                    style: styles.mapPlaceholder,
-                    onPress: () => void openInMaps(),
-                    onLayout: onMapViewportLayout,
-                  },
-                  mapPreview
-                    ? React.createElement(
-                        View,
-                        {
-                          style: [
-                            styles.mapCanvas,
-                            {
-                              left: mapCanvasOffset.left,
-                              top: mapCanvasOffset.top,
-                            },
-                          ],
-                        },
-                        ...mapPreview.tiles.map((tile) =>
-                          React.createElement(Image, {
-                            key: tile.key,
-                            source: {
-                              uri: tile.uri,
-                            },
-                            style: [styles.mapTile, { left: tile.left, top: tile.top }],
-                            resizeMode: 'cover',
-                          })
-                        )
-                      )
-                    : React.createElement(Text, {
-                        style: styles.mapPin,
-                        children: 'Karttaa ladataan...',
-                      }),
-                  mapPreview
-                    ? React.createElement(View, {
-                        style: [
-                          styles.mapDot,
-                          {
-                            left: '50%',
-                            top: '50%',
-                          },
-                        ],
-                      })
-                    : null
-                ),
-                React.createElement(Text, {
-                  style: styles.modalSubLine,
-                  children: `Osoite: ${selectedSection ? getFacilityAddress(selectedSection) ?? 'Ei saatavilla' : '-'}`,
-                }),
-                React.createElement(Text, {
-                  style: styles.modalSubLine,
-                  children: `Kuvaus: ${selectedSection?.description ?? 'Ei kuvausta'}`,
-                }),
-                bookingError
-                  ? React.createElement(Text, {
-                      style: styles.bookingErrorText,
-                      children: bookingError,
-                    })
-                  : null,
-                bookingFeedback
-                  ? React.createElement(Text, {
-                      style: styles.bookingFeedbackText,
-                      children: bookingFeedback,
-                    })
-                  : null,
-                React.createElement(
-                  View,
-                  { style: styles.slotsContainer },
-                  React.createElement(Text, {
-                    style: styles.slotsTitle,
-                    children: slotsTitle,
-                  }),
-                  isLoadingSlots
-                    ? React.createElement(ActivityIndicator, {
-                        size: 'small',
-                        style: styles.slotLoader,
-                      })
-                    : React.createElement(
-                        ScrollView,
-                        {
-                          style: styles.slotBookingList,
-                          contentContainerStyle: styles.slotBookingListContent,
-                        },
-                        ...selectedSectionSlotRows
-                      )
-                ),
-                React.createElement(Button, {
-                  mode: 'text',
-                  style: styles.closeBookingModalButton,
-                  onPress: () => setSelectedSection(null),
-                  children: 'Sulje',
-                })
-              ),
-            }
-          ),
-          React.createElement(
-            Dialog,
-            {
-              visible: !!pendingBookingSlot,
-              onDismiss: () => setPendingBookingSlot(null),
-              style: styles.confirmDialog,
-              children: [
-                React.createElement(Dialog.Title, {
-                  key: 'confirm-title',
-                  children: 'Vahvista varaus',
-                }),
-                React.createElement(
-                  Dialog.Content,
-                  {
-                    key: 'confirm-content',
-                    children: React.createElement(Text, {
-                      children: `Haluatko varata vuoron ${pendingBookingSlot?.label ?? ''}?`,
-                    }),
-                  }
-                ),
-                React.createElement(
-                  Dialog.Actions,
-                  {
-                    key: 'confirm-actions',
-                    children: [
-                      React.createElement(Button, {
-                        key: 'confirm-cancel',
-                        onPress: () => setPendingBookingSlot(null),
-                        disabled: isSubmittingBooking,
-                        children: 'Peruuta',
-                      }),
-                      React.createElement(Button, {
-                        key: 'confirm-submit',
-                        onPress: confirmBookSlot,
-                        loading: isSubmittingBooking,
-                        disabled: isSubmittingBooking,
-                        children: 'Varaa',
-                      }),
-                    ],
-                  }
-                ),
-              ],
-            },
-
+            View,
+            { style: styles.confirmDialog },
+            React.createElement(Text, {
+              style: styles.modalPickerTitle,
+              children: 'Vahvista varaus',
+            }),
+            React.createElement(Text, {
+              children: `Haluatko varata vuoron ${pendingBookingSlot?.label ?? ''}?`,
+            }),
+            React.createElement(
+              View,
+              { style: styles.modalPickerActions },
+              React.createElement(Button, {
+                onPress: () => setPendingBookingSlot(null),
+                disabled: isSubmittingBooking,
+                children: 'Peruuta',
+              }),
+              React.createElement(Button, {
+                onPress: confirmBookSlot,
+                loading: isSubmittingBooking,
+                disabled: isSubmittingBooking,
+                children: 'Varaa',
+              })
+            )
           )
-        ),
-      })
+        )
+      )
     )
   );
 }
@@ -2045,23 +2126,24 @@ const createStyles = (
       fontWeight: '500',
     },
     dialog: {
-      backgroundColor: 'transparent',
       alignSelf: 'center',
-      width: '90%',
-      maxWidth: metrics.isTablet ? 520 : 380,
-      borderRadius: metrics.scale(18, 14, 24),
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: dark ? 0.45 : 0.22,
-      shadowRadius: 28,
-      elevation: dark ? 16 : 12,
+      width: '100%',
+      maxWidth: metrics.isTablet ? 460 : 360,
       marginTop: 0,
     },
     confirmDialog: {
+      alignSelf: 'center',
+      width: '88%',
+      minWidth: metrics.scale(280, 260, 320),
+      maxWidth: metrics.isTablet ? 560 : 340,
       backgroundColor: dark ? '#1e293b' : colors.surface,
       borderWidth: 1,
       borderColor: dark ? '#334155' : colors.outline,
       borderRadius: metrics.scale(24, 18, 30),
+      paddingHorizontal: metrics.scale(24, 20, 28),
+      paddingTop: metrics.scale(20, 16, 24),
+      paddingBottom: metrics.scale(10, 8, 14),
+      gap: metrics.scale(14, 12, 18),
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 12 },
       shadowOpacity: dark ? 0.45 : 0.22,
@@ -2137,6 +2219,12 @@ const createStyles = (
       fontSize: metrics.scale(14, 12, 18),
       fontWeight: '700',
       marginBottom: metrics.scale(6, 4, 10),
+    },
+    slotsDayActions: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: metrics.scale(4, 2, 8),
     },
     slotLoader: {
       marginVertical: metrics.scale(10, 8, 14),

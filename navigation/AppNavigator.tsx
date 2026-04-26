@@ -23,7 +23,11 @@ export type RootStackParamList = {
         booked?: boolean;
       }
     | undefined;
-  login: undefined;
+  login:
+    | {
+        returnToPrevious?: boolean;
+      }
+    | undefined;
   forgotPassword: undefined;
   register: undefined;
   profile: undefined;
@@ -93,6 +97,7 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
           <Search
             onBack={() => navigation.goBack()}
             onGoHome={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
+            onGoLogin={() => navigation.navigate('login', { returnToPrevious: true })}
             initialSearchMode={route.params?.mode}
             initialSport={route.params?.sport}
             initialName={route.params?.name}
@@ -102,12 +107,19 @@ export default function AppNavigator({ isDarkMode, onToggleDarkMode }: AppNaviga
       </Stack.Screen>
 
       <Stack.Screen name="login">
-        {({ navigation }) => (
+        {({ navigation, route }) => (
           <Login
             onBack={() => navigation.goBack()}
             onGoHome={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
             onForgotPassword={() => navigation.navigate('forgotPassword')}
-            onLogin={() => navigation.reset({ index: 0, routes: [{ name: 'main' }] })}
+            onLogin={() => {
+              if (route.params?.returnToPrevious) {
+                navigation.goBack();
+                return;
+              }
+
+              navigation.reset({ index: 0, routes: [{ name: 'main' }] });
+            }}
             onRegister={() => navigation.navigate('register')}
           />
         )}
