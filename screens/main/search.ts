@@ -306,7 +306,7 @@ export default function Search({
         if (mode === 'sport') {
           const value = (sportOverride ?? sportInput).trim();
           if (!value) {
-            throw new Error('Syota laji ennen hakua.');
+            throw new Error('Syötä laji ennen hakua.');
           }
           nextSections = (await searchFacilitySectionsBySport(value)).filter(
             (section) => section.isBooked !== true
@@ -314,7 +314,7 @@ export default function Search({
         } else if (mode === 'name') {
           const value = (nameOverride ?? nameInput).trim();
           if (!value) {
-            throw new Error('Syota kentan nimi ennen hakua.');
+            throw new Error('Syötä kentan nimi ennen hakua.');
           }
 
           if (!db) {
