@@ -251,6 +251,10 @@ export default function Search({
   const [isSubmittingBooking, setIsSubmittingBooking] = React.useState(false);
   const [bookingFeedback, setBookingFeedback] = React.useState<string | null>(null);
   const [bookingError, setBookingError] = React.useState<string | null>(null);
+  const [isActiveBookingLimitModalOpen, setIsActiveBookingLimitModalOpen] = React.useState(false);
+  const [activeBookingLimitMessage, setActiveBookingLimitMessage] = React.useState(
+    'Sinulla voi olla enintaan 2 aktiivista varausta.'
+  );
   const [selectedSectionSnapshot, setSelectedSectionSnapshot] = React.useState<FacilitySection | null>(null);
   const [isLoginRequiredModalOpen, setIsLoginRequiredModalOpen] = React.useState(false);
   const [loginRequiredMessage, setLoginRequiredMessage] = React.useState('Kirjaudu sisään varataksesi vuoron');
@@ -824,6 +828,14 @@ export default function Search({
         const message = error instanceof Error
           ? error.message
           : 'Varaus epäonnistui. Yritä uudelleen.';
+
+        if (/enintaan 2 aktiivista varausta/i.test(message)) {
+          setBookingError(null);
+          setActiveBookingLimitMessage(message);
+          setIsActiveBookingLimitModalOpen(true);
+          return;
+        }
+
         setBookingError(message);
       } finally {
         setIsSubmittingBooking(false);
@@ -1756,6 +1768,36 @@ export default function Search({
                 style: styles.closeBookingModalButton,
                 onPress: () => setSelectedSection(null),
                 children: 'Sulje',
+              })
+            )
+          )
+        )
+      ),
+      React.createElement(
+        Modal,
+        {
+          visible: isActiveBookingLimitModalOpen,
+          transparent: true,
+          animationType: 'fade',
+          onRequestClose: () => undefined,
+        },
+        React.createElement(
+          View,
+          { style: styles.modalBackdrop },
+          React.createElement(
+            View,
+            { style: styles.modalPickerCard },
+            React.createElement(Text, {
+              style: styles.modalPickerTitle,
+              children: activeBookingLimitMessage,
+            }),
+            React.createElement(
+              View,
+              { style: styles.modalPickerActions },
+              React.createElement(Button, {
+                mode: 'text',
+                onPress: () => setIsActiveBookingLimitModalOpen(false),
+                children: 'OK',
               })
             )
           )
